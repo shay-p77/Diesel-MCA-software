@@ -1,9 +1,16 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Dashboard from './pages/Dashboard'
+import DealDetail from './pages/DealDetail'
+import './index.css'
+
 function App() {
   return (
-    <div className="app">
-      <h1>Diesel MCA Software</h1>
-      <p>Welcome to the Merchant Cash Advance management system.</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/deal/:id" element={<DealDetail />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 

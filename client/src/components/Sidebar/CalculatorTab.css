@@ -1,0 +1,210 @@
+.calculator-tab {
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  overflow-y: auto;
+}
+
+.calc-section {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.calc-section h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.input-group {
+  margin-bottom: 0.75rem;
+}
+
+.input-group label {
+  display: block;
+  font-size: 0.75rem;
+  color: #666;
+  margin-bottom: 0.25rem;
+}
+
+.input-group input,
+.input-group select {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.input-group input:focus,
+.input-group select:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.input-with-prefix {
+  display: flex;
+  align-items: center;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.input-with-prefix span {
+  padding: 0.5rem 0.75rem;
+  background: #eee;
+  color: #666;
+  font-size: 0.875rem;
+}
+
+.input-with-prefix input {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+}
+
+.input-with-prefix input:focus {
+  outline: none;
+}
+
+.calc-results {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+}
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.375rem 0;
+  font-size: 0.875rem;
+}
+
+.result-row span {
+  color: #666;
+}
+
+.result-row strong {
+  color: #2563eb;
+}
+
+/* Stacking */
+.stacking-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stack-item {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  padding: 0.25rem 0;
+}
+
+.stack-item .label {
+  color: #666;
+}
+
+.stack-item .value {
+  font-weight: 500;
+}
+
+.stack-item.total {
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid #ddd;
+}
+
+.stack-item.total .label,
+.stack-item.total .value {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Utilization */
+.utilization {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+}
+
+.utilization-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  margin-bottom: 0.5rem;
+}
+
+.utilization-header .good {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.utilization-header .warning {
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.utilization-header .danger {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.utilization-bar {
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.utilization-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.utilization-fill.good {
+  background: #16a34a;
+}
+
+.utilization-fill.warning {
+  background: #ea580c;
+}
+
+.utilization-fill.danger {
+  background: #dc2626;
+}
+
+.utilization-note {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* Scenarios */
+.scenarios {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.scenarios button {
+  padding: 0.5rem;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  background: white;
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.scenarios button:hover {
+  border-color: #2563eb;
+  background: #f0f7ff;
+}
