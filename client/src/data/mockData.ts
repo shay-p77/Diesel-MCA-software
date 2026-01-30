@@ -1,4 +1,4 @@
-import { Deal } from './types'
+import { Deal } from '../types'
 
 export const mockDeals: Deal[] = [
   {

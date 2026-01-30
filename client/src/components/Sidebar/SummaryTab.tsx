@@ -13,9 +13,6 @@ export default function SummaryTab({ deal }: SummaryTabProps) {
     .filter(p => p.frequency === 'Daily')
     .reduce((sum, p) => sum + p.payment, 0)
 
-  const totalPositionBalance = deal.existingPositions
-    .reduce((sum, p) => sum + p.estimatedBalance, 0)
-
   // Mock AI insights based on the extracted data
   const aiInsights = [
     {

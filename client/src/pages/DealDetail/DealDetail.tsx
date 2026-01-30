@@ -36,7 +36,7 @@ export default function DealDetail() {
   }
 
   const formatStatus = (status: typeof deal.status) => {
-    return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
+    return status.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())
   }
 
   return (
