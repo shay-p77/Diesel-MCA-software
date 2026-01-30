@@ -24,8 +24,8 @@
 
 .search-box input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  border-color: #3d6b99;
+  box-shadow: 0 0 0 3px rgba(61, 107, 153, 0.1);
 }
 
 .filter-group {
@@ -45,7 +45,7 @@
 
 .filter-group select:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #3d6b99;
 }
 
 @media (max-width: 768px) {

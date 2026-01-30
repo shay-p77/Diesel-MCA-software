@@ -1,13 +1,10 @@
 import './FilterBar.css'
 
-export type StatusFilter = 'all' | 'pending' | 'under_review' | 'approved' | 'declined'
 export type SortOption = 'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc' | 'name_asc'
 
 interface FilterBarProps {
   searchQuery: string
   onSearchChange: (query: string) => void
-  statusFilter: StatusFilter
-  onStatusChange: (status: StatusFilter) => void
   industryFilter: string
   onIndustryChange: (industry: string) => void
   industries: string[]
@@ -18,8 +15,6 @@ interface FilterBarProps {
 export default function FilterBar({
   searchQuery,
   onSearchChange,
-  statusFilter,
-  onStatusChange,
   industryFilter,
   onIndustryChange,
   industries,
@@ -38,17 +33,6 @@ export default function FilterBar({
       </div>
 
       <div className="filter-group">
-        <select
-          value={statusFilter}
-          onChange={(e) => onStatusChange(e.target.value as StatusFilter)}
-        >
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="under_review">Under Review</option>
-          <option value="approved">Approved</option>
-          <option value="declined">Declined</option>
-        </select>
-
         <select
           value={industryFilter}
           onChange={(e) => onIndustryChange(e.target.value)}

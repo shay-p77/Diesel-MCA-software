@@ -18,3 +18,25 @@
   background: white;
   border-radius: 10px;
 }
+
+.loading-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #666;
+  font-size: 1rem;
+}
+
+.error-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #dc2626;
+}
+
+.error-state p {
+  margin: 0.5rem 0;
+}
+
+.error-hint {
+  color: #888;
+  font-size: 0.875rem;
+}

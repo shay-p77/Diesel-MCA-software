@@ -1,48 +1,51 @@
 .header {
-  background: #1a1a2e;
-  color: white;
-  padding: 1rem 2rem;
+  background: white;
+  color: #1e4a7a;
+  padding: 0.75rem 2rem;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .header-left {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
+  gap: 1rem;
 }
 
-.header-left h1 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  margin: 0;
+.header-logo {
+  height: 40px;
+  cursor: pointer;
 }
 
 .header-left .subtitle {
   font-size: 0.875rem;
-  color: #888;
+  color: #6b7280;
+  border-left: 1px solid #e5e7eb;
+  padding-left: 1rem;
 }
 
 .btn-back {
   background: transparent;
-  border: 1px solid #444;
-  color: #ccc;
+  border: 1px solid #d1d5db;
+  color: #6b7280;
   padding: 0.5rem 1rem;
   border-radius: 6px;
   font-size: 0.875rem;
   cursor: pointer;
-  margin-right: 1rem;
+  margin-right: 0.5rem;
   transition: all 0.2s;
 }
 
 .btn-back:hover {
-  background: #333;
-  color: white;
+  background: #f3f4f6;
+  border-color: #9ca3af;
+  color: #1e4a7a;
 }
 
 .btn-upload {
-  background: #2563eb;
+  background: #1e4a7a;
   color: white;
   border: none;
   padding: 0.625rem 1.25rem;
@@ -54,5 +57,5 @@
 }
 
 .btn-upload:hover {
-  background: #1d4ed8;
+  background: #163a5f;
 }

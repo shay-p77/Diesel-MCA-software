@@ -85,6 +85,33 @@
   letter-spacing: 0.5px;
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.section-header h4 {
+  margin: 0;
+}
+
+.btn-edit-deal {
+  padding: 0.25rem 0.75rem;
+  background: #1e4a7a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-edit-deal:hover {
+  background: #163a5f;
+}
+
 /* Spreadsheet Table */
 .spreadsheet-section {
   background: white;

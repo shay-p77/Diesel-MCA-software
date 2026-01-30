@@ -4,9 +4,10 @@ import './SummaryTab.css'
 
 interface SummaryTabProps {
   deal: Deal
+  onEditDeal?: () => void
 }
 
-export default function SummaryTab({ deal }: SummaryTabProps) {
+export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
   const [activeView, setActiveView] = useState<'extracted' | 'analysis'>('extracted')
 
   const dailyObligation = deal.existingPositions
@@ -172,20 +173,19 @@ export default function SummaryTab({ deal }: SummaryTabProps) {
 
           {/* Deal Info */}
           <section className="summary-section">
-            <h4>Deal Information</h4>
+            <div className="section-header">
+              <h4>Deal Information</h4>
+              {onEditDeal && (
+                <button className="btn-edit-deal" onClick={onEditDeal}>
+                  Edit
+                </button>
+              )}
+            </div>
             <table className="spreadsheet-table">
               <tbody>
                 <tr>
                   <td className="cell-label">Business</td>
                   <td className="cell-value">{deal.businessName}</td>
-                </tr>
-                <tr>
-                  <td className="cell-label">Owner</td>
-                  <td className="cell-value">{deal.ownerName}</td>
-                </tr>
-                <tr>
-                  <td className="cell-label">Industry</td>
-                  <td className="cell-value">{deal.industry}</td>
                 </tr>
                 <tr>
                   <td className="cell-label">Requesting</td>
@@ -195,6 +195,18 @@ export default function SummaryTab({ deal }: SummaryTabProps) {
                   <td className="cell-label">Submitted</td>
                   <td className="cell-value">{new Date(deal.dateSubmitted).toLocaleDateString()}</td>
                 </tr>
+                {deal.broker && (
+                  <tr>
+                    <td className="cell-label">Broker / ISO</td>
+                    <td className="cell-value">{deal.broker}</td>
+                  </tr>
+                )}
+                {deal.notes && (
+                  <tr>
+                    <td className="cell-label">Notes</td>
+                    <td className="cell-value">{deal.notes}</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </section>

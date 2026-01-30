@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { Deal, ChatMessage } from '../../types'
+import { api } from '../../services/api'
 import './ChatTab.css'
 
 interface ChatTabProps {
@@ -7,53 +8,71 @@ interface ChatTabProps {
 }
 
 export default function ChatTab({ deal }: ChatTabProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
+  const [messages, setMessages] = useState<ChatMessage[]>([])
+  const [input, setInput] = useState('')
+  const [loading, setLoading] = useState(false)
+  const messagesEndRef = useRef<HTMLDivElement>(null)
+
+  // Initialize with a welcome message
+  useEffect(() => {
+    const hasData = deal.bankData && deal.extractionStatus === 'done'
+    const welcomeMessage: ChatMessage = {
       id: '1',
       role: 'assistant',
-      content: `I've analyzed the bank statements for ${deal.businessName}. I can help you understand the financials, identify risks, or answer any questions about this deal. What would you like to know?`,
-      timestamp: new Date()
+      content: hasData
+        ? `I've analyzed the bank statements for ${deal.businessName}. I can help you understand the financials, identify risks, or answer any questions about this deal. What would you like to know?`
+        : `I'm ready to help analyze ${deal.businessName} once bank statement data is extracted. Upload a PDF to get started, or ask me general questions about the deal.`,
+      timestamp: new Date().toISOString()
     }
-  ])
-  const [input, setInput] = useState('')
+    setMessages([welcomeMessage])
+  }, [deal.businessName, deal.extractionStatus])
 
-  const handleSend = () => {
-    if (!input.trim()) return
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [messages])
+
+  const handleSend = async () => {
+    if (!input.trim() || loading) return
 
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       role: 'user',
       content: input,
-      timestamp: new Date()
+      timestamp: new Date().toISOString()
     }
 
-    // Mock AI response
-    const mockResponses: Record<string, string> = {
-      'nsf': `Based on the bank statements, I found ${deal.bankData?.nsfs || 0} NSF fees. ${deal.bankData?.nsfs && deal.bankData.nsfs > 2 ? 'This is a concern as it indicates cash flow management issues.' : 'This is within acceptable range.'}`,
-      'position': `I detected ${deal.existingPositions.length} existing MCA positions. ${deal.existingPositions.length > 2 ? 'High stacking - proceed with caution.' : deal.existingPositions.length > 0 ? 'Moderate stacking level.' : 'Clean - no existing positions.'}`,
-      'deposit': `Average daily deposits are $${deal.bankData?.dailyAvgDeposit?.toLocaleString() || 'N/A'}. Total deposits for the period: $${deal.bankData?.totalDeposits?.toLocaleString() || 'N/A'}.`,
-      'risk': `Key risk factors for this deal:\n${deal.bankData?.nsfs && deal.bankData.nsfs > 2 ? '- Multiple NSFs detected\n' : ''}${deal.existingPositions.length > 2 ? '- High position stacking\n' : ''}${deal.bankData?.negativeDays && deal.bankData.negativeDays > 0 ? '- Account went negative ' + deal.bankData.negativeDays + ' days\n' : ''}${deal.bankData?.nsfs === 0 && deal.existingPositions.length === 0 ? '- Low risk profile overall' : ''}`,
-      'recommend': `Based on my analysis:\n\nAmount Requested: $${deal.amountRequested.toLocaleString()}\nDaily Deposits: $${deal.bankData?.dailyAvgDeposit?.toLocaleString() || 'N/A'}\nExisting Daily Obligation: $${deal.existingPositions.filter(p => p.frequency === 'Daily').reduce((s, p) => s + p.payment, 0).toLocaleString()}\n\n${deal.existingPositions.length > 3 || (deal.bankData?.nsfs || 0) > 4 ? 'Recommendation: DECLINE or reduce amount significantly.' : deal.existingPositions.length > 1 ? 'Recommendation: APPROVE with reduced amount and careful terms.' : 'Recommendation: Likely APPROVABLE pending final review.'}`
-    }
-
-    let aiResponse = "I'm analyzing the bank statements. In production, I would provide detailed insights based on your question. Try asking about: NSFs, positions, deposits, risks, or recommendations."
-
-    const lowerInput = input.toLowerCase()
-    if (lowerInput.includes('nsf')) aiResponse = mockResponses['nsf']
-    else if (lowerInput.includes('position') || lowerInput.includes('stack')) aiResponse = mockResponses['position']
-    else if (lowerInput.includes('deposit')) aiResponse = mockResponses['deposit']
-    else if (lowerInput.includes('risk')) aiResponse = mockResponses['risk']
-    else if (lowerInput.includes('recommend') || lowerInput.includes('approve') || lowerInput.includes('should')) aiResponse = mockResponses['recommend']
-
-    const assistantMessage: ChatMessage = {
-      id: (Date.now() + 1).toString(),
-      role: 'assistant',
-      content: aiResponse,
-      timestamp: new Date()
-    }
-
-    setMessages([...messages, userMessage, assistantMessage])
+    setMessages(prev => [...prev, userMessage])
     setInput('')
+    setLoading(true)
+
+    try {
+      // Build history for context (exclude the initial welcome message)
+      const history = messages.slice(1).map(m => ({
+        id: m.id,
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp
+      }))
+
+      const response = await api.sendChatMessage(deal.id, input, history)
+      setMessages(prev => [...prev, response])
+    } catch (err: any) {
+      const errorMessage = err.message || 'Failed to get response'
+
+      // Add error message to chat
+      const errorChatMessage: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant',
+        content: errorMessage.includes('not configured')
+          ? 'Claude AI is not configured yet. Please ask your administrator to add the Anthropic API key.'
+          : `Sorry, I encountered an error: ${errorMessage}`,
+        timestamp: new Date().toISOString()
+      }
+      setMessages(prev => [...prev, errorChatMessage])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -75,12 +94,27 @@ export default function ChatTab({ deal }: ChatTabProps) {
       <div className="chat-messages">
         {messages.map(msg => (
           <div key={msg.id} className={`chat-message ${msg.role}`}>
-            <div className="message-content">{msg.content}</div>
+            <div className="message-content">
+              {msg.content.split('\n').map((line, i) => (
+                <span key={i}>
+                  {line}
+                  {i < msg.content.split('\n').length - 1 && <br />}
+                </span>
+              ))}
+            </div>
           </div>
         ))}
+        {loading && (
+          <div className="chat-message assistant">
+            <div className="message-content typing">
+              <span className="typing-indicator">Analyzing</span>
+            </div>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      {messages.length === 1 && (
+      {messages.length === 1 && !loading && (
         <div className="suggested-questions">
           {suggestedQuestions.map((q, i) => (
             <button key={i} onClick={() => setInput(q)} className="suggestion-btn">
@@ -97,9 +131,10 @@ export default function ChatTab({ deal }: ChatTabProps) {
           onKeyDown={handleKeyDown}
           placeholder="Ask about this deal..."
           rows={2}
+          disabled={loading}
         />
-        <button onClick={handleSend} disabled={!input.trim()}>
-          Send
+        <button onClick={handleSend} disabled={!input.trim() || loading}>
+          {loading ? '...' : 'Send'}
         </button>
       </div>
     </div>

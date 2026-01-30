@@ -53,3 +53,18 @@ export interface ChatMessage {
   content: string
   timestamp: string
 }
+
+export interface CreateDealRequest {
+  businessName?: string
+  amountRequested?: number
+  dateSubmitted?: string
+  broker?: string
+  notes?: string
+  ownerName?: string
+  industry?: string
+}
+
+export interface ChatRequest {
+  message: string
+  history?: ChatMessage[]
+}

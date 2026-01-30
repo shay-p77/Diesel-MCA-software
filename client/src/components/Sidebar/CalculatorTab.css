@@ -44,7 +44,7 @@
 .input-group input:focus,
 .input-group select:focus {
   outline: none;
-  border-color: #2563eb;
+  border-color: #3d6b99;
 }
 
 .input-with-prefix {
@@ -90,7 +90,7 @@
 }
 
 .result-row strong {
-  color: #2563eb;
+  color: #3d6b99;
 }
 
 /* Stacking */
@@ -205,6 +205,6 @@
 }
 
 .scenarios button:hover {
-  border-color: #2563eb;
-  background: #f0f7ff;
+  border-color: #3d6b99;
+  background: #f0f5fa;
 }

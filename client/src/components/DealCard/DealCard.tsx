@@ -9,19 +9,6 @@ interface DealCardProps {
 export default function DealCard({ deal }: DealCardProps) {
   const navigate = useNavigate()
 
-  const getStatusBadgeClass = (status: Deal['status']) => {
-    switch (status) {
-      case 'pending': return 'badge-pending'
-      case 'under_review': return 'badge-review'
-      case 'approved': return 'badge-approved'
-      case 'declined': return 'badge-declined'
-    }
-  }
-
-  const formatStatus = (status: Deal['status']) => {
-    return status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())
-  }
-
   const positionCount = deal.existingPositions.length
 
   const dailyObligation = deal.existingPositions
@@ -33,25 +20,28 @@ export default function DealCard({ deal }: DealCardProps) {
       <div className="deal-main">
         <div className="deal-header">
           <h3>{deal.businessName}</h3>
-          <span className={`status-badge ${getStatusBadgeClass(deal.status)}`}>
-            {formatStatus(deal.status)}
-          </span>
         </div>
 
         <div className="deal-meta">
-          <span>{deal.ownerName}</span>
-          <span className="separator">|</span>
-          <span>{deal.industry}</span>
+          <span className="deal-amount-inline">${deal.amountRequested.toLocaleString()}</span>
           <span className="separator">|</span>
           <span>{new Date(deal.dateSubmitted).toLocaleDateString()}</span>
+          {deal.broker && (
+            <>
+              <span className="separator">|</span>
+              <span>{deal.broker}</span>
+            </>
+          )}
         </div>
 
-        <div className="deal-amount">
-          <span className="amount-label">Requesting</span>
-          <span className="amount-value">${deal.amountRequested.toLocaleString()}</span>
-        </div>
-
-        <p className="deal-summary">{deal.aiSummary}</p>
+        <p className="deal-summary">
+          {deal.aiSummary || (deal.extractionStatus === 'processing'
+            ? 'Processing bank statement...'
+            : 'Upload bank statement for AI analysis')}
+        </p>
+        {deal.extractionStatus === 'processing' && (
+          <span className="extraction-badge">Extracting data...</span>
+        )}
       </div>
 
       <div className="deal-indicators">

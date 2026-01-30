@@ -5,9 +5,10 @@ interface HeaderProps {
   showUpload?: boolean
   showBack?: boolean
   title?: string
+  onNewDeal?: () => void
 }
 
-export default function Header({ showUpload = true, showBack = false, title }: HeaderProps) {
+export default function Header({ showUpload = true, showBack = false, title, onNewDeal }: HeaderProps) {
   const navigate = useNavigate()
 
   return (
@@ -18,13 +19,18 @@ export default function Header({ showUpload = true, showBack = false, title }: H
             ← Back
           </button>
         )}
-        <h1 onClick={() => navigate('/')} style={{ cursor: 'pointer' }}>Diesel</h1>
-        <span className="subtitle">{title || 'MCA Underwriting'}</span>
+        <img
+          src="/DF_logo.png"
+          alt="Amkus"
+          className="header-logo"
+          onClick={() => navigate('/')}
+        />
+        {title && <span className="subtitle">{title}</span>}
       </div>
       <div className="header-right">
         {showUpload && (
-          <button className="btn-upload">
-            + Upload Statement
+          <button className="btn-upload" onClick={onNewDeal}>
+            + New Deal
           </button>
         )}
       </div>

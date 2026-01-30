@@ -15,12 +15,12 @@ export default function StatsRow({ deals }: StatsRowProps) {
         <span className="stat-label">Total Deals</span>
       </div>
       <div className="stat-card">
-        <span className="stat-value">{deals.filter(d => d.status === 'pending').length}</span>
-        <span className="stat-label">Pending</span>
+        <span className="stat-value">{deals.filter(d => d.extractionStatus === 'done').length}</span>
+        <span className="stat-label">Analyzed</span>
       </div>
       <div className="stat-card">
-        <span className="stat-value">{deals.filter(d => d.status === 'under_review').length}</span>
-        <span className="stat-label">Under Review</span>
+        <span className="stat-value">{deals.filter(d => !d.extractionStatus || d.extractionStatus === 'pending').length}</span>
+        <span className="stat-label">Awaiting Upload</span>
       </div>
       <div className="stat-card">
         <span className="stat-value">${(totalRequested / 1000).toFixed(0)}k</span>

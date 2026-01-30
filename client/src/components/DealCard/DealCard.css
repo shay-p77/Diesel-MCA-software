@@ -29,7 +29,7 @@
   margin: 0;
   font-size: 1.125rem;
   font-weight: 600;
-  color: #1a1a2e;
+  color: #1e4a7a;
 }
 
 .status-badge {
@@ -72,6 +72,11 @@
   color: #ccc;
 }
 
+.deal-amount-inline {
+  font-weight: 600;
+  color: #3d6b99;
+}
+
 .deal-amount {
   display: flex;
   align-items: baseline;
@@ -88,7 +93,7 @@
 .amount-value {
   font-size: 1.25rem;
   font-weight: 700;
-  color: #2563eb;
+  color: #3d6b99;
 }
 
 .deal-summary {
