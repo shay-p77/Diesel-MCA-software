@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import Header from '../../components/Header'
 import { SummaryTab, ChatTab, CalculatorTab } from '../../components/Sidebar'
 import DealModal from '../../components/DealModal'
+import PDFViewer from '../../components/PDFViewer/PDFViewer'
 import { api } from '../../services/api'
 import { Deal } from '../../types'
 import './DealDetail.css'
@@ -15,11 +16,11 @@ export default function DealDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<TabType>('summary')
-  const [pdfSearch, setPdfSearch] = useState('')
   const [uploading, setUploading] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [selectedAccountIndex, setSelectedAccountIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleStatusChange = async (newStatus: 'pending' | 'under_review' | 'approved' | 'declined') => {
@@ -87,13 +88,13 @@ export default function DealDetail() {
   }, [deal?.extractionStatus, id])
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file || !id) return
+    const files = e.target.files
+    if (!files || files.length === 0 || !id) return
 
     try {
       setUploading(true)
       setUploadError(null)
-      const result = await api.uploadPdf(id, file)
+      const result = await api.uploadPdfs(id, Array.from(files))
       setDeal(result.deal)
     } catch (err: any) {
       setUploadError(err.message || 'Upload failed')
@@ -125,6 +126,12 @@ export default function DealDetail() {
       </div>
     )
   }
+
+  // Determine if using multi-account structure or legacy
+  const hasMultipleAccounts = deal.bankAccounts && deal.bankAccounts.length > 0
+  const hasPdf = hasMultipleAccounts
+    ? deal.bankAccounts.some(acc => acc.pdfFileName)
+    : deal.pdfFileName
 
   return (
     <div className="deal-detail">
@@ -178,57 +185,76 @@ export default function DealDetail() {
       <div className="deal-content">
         {/* PDF Viewer */}
         <div className="pdf-viewer">
-          <div className="pdf-toolbar">
-            <input
-              type="text"
-              placeholder="Search in PDF..."
-              value={pdfSearch}
-              onChange={(e) => setPdfSearch(e.target.value)}
-              className="pdf-search"
-            />
-            <div className="pdf-controls">
-              <button title="Zoom Out">-</button>
-              <span>100%</span>
-              <button title="Zoom In">+</button>
-              <button title="Download">Download</button>
-            </div>
-          </div>
-          <div className="pdf-container">
-            {deal.pdfFileName ? (
-              <div className="pdf-uploaded">
-                <div className="pdf-icon">PDF</div>
-                <p className="pdf-filename">{deal.pdfFileName}</p>
-                {deal.extractionStatus === 'processing' && (
-                  <p className="extraction-status processing">Extracting data from Koncile...</p>
-                )}
-                {deal.extractionStatus === 'done' && (
-                  <p className="extraction-status done">Extraction complete</p>
-                )}
-                {deal.extractionStatus === 'failed' && (
-                  <p className="extraction-status failed">Extraction failed</p>
-                )}
-              </div>
-            ) : (
+          {hasPdf ? (
+            <>
+              {/* Account Selector for Multiple Accounts */}
+              {hasMultipleAccounts && deal.bankAccounts.length > 1 && (
+                <div className="account-selector">
+                  <label htmlFor="account-select">View Account:</label>
+                  <select
+                    id="account-select"
+                    value={selectedAccountIndex}
+                    onChange={(e) => setSelectedAccountIndex(Number(e.target.value))}
+                  >
+                    {deal.bankAccounts.map((account, index) => (
+                      <option key={account.id} value={index}>
+                        {account.accountName || `Account ${index + 1}`}
+                        {account.accountNumber && ` (****${account.accountNumber.slice(-4)})`}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    className="btn-add-account"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    + Add Account
+                  </button>
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    accept=".pdf"
+                    multiple
+                    onChange={handleFileUpload}
+                    style={{ display: 'none' }}
+                  />
+                </div>
+              )}
+
+              {hasMultipleAccounts ? (
+                <PDFViewer
+                  pdfUrl={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/deals/${deal.id}/pdf/${deal.bankAccounts[selectedAccountIndex].id}`}
+                  fileName={deal.bankAccounts[selectedAccountIndex].pdfFileName}
+                />
+              ) : (
+                <PDFViewer
+                  pdfUrl={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/deals/${deal.id}/pdf`}
+                  fileName={deal.pdfFileName || 'document.pdf'}
+                />
+              )}
+            </>
+          ) : (
+            <div className="pdf-container">
               <div className="pdf-placeholder">
                 <input
                   type="file"
                   ref={fileInputRef}
                   accept=".pdf"
+                  multiple
                   onChange={handleFileUpload}
                   style={{ display: 'none' }}
                   id="pdf-upload"
                 />
                 <label htmlFor="pdf-upload" className="upload-area">
                   <div className="pdf-icon upload">+</div>
-                  <p>{uploading ? 'Uploading...' : 'Upload Bank Statement'}</p>
+                  <p>{uploading ? 'Uploading...' : 'Upload Bank Statements'}</p>
                   <p className="pdf-subtext">
-                    Click to select a PDF file
+                    Click to select PDF files (multiple allowed)
                   </p>
                 </label>
                 {uploadError && <p className="upload-error">{uploadError}</p>}
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* Sidebar */}

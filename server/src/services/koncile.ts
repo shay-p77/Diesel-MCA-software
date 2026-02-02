@@ -105,6 +105,12 @@ export class KoncileService {
       }
     )
 
+    // Koncile returns {task_ids: [...]} but we need {task_id: ...}
+    const data = response.data
+    if (data.task_ids && Array.isArray(data.task_ids) && data.task_ids.length > 0) {
+      return { task_id: data.task_ids[0] }
+    }
+
     return response.data
   }
 
@@ -223,12 +229,18 @@ export class KoncileService {
   }> {
     const transactions: any[] = []
 
-    // Line fields come as arrays - each index represents one transaction
-    const dates = lineFields['Transaction date']?.values || []
-    const types = lineFields['Transaction type']?.values || []
-    const amounts = lineFields['Transaction amount']?.values || []
-    const checkNumbers = lineFields['Check number']?.values || []
-    const descriptions = lineFields['Transaction description']?.values || []
+    // Line fields can be either an object with .values or directly an array
+    const getFieldArray = (fieldName: string) => {
+      const field = lineFields[fieldName]
+      if (!field) return []
+      return Array.isArray(field) ? field : (field.values || [])
+    }
+
+    const dates = getFieldArray('Transaction date')
+    const types = getFieldArray('Transaction type')
+    const amounts = getFieldArray('Transaction amount')
+    const checkNumbers = getFieldArray('Check number')
+    const descriptions = getFieldArray('Transaction description')
 
     const count = Math.max(dates.length, types.length, amounts.length)
 

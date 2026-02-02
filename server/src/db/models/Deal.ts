@@ -1,11 +1,12 @@
 import mongoose, { Schema } from 'mongoose'
 import { Deal } from '../../types/index.js'
+import { encrypt, decrypt } from '../../utils/encryption.js'
 
 const TransactionSchema = new Schema({
   date: String,
   type: String,
   amount: Number,
-  description: String,
+  description: String, // Will be encrypted
   checkNumber: String,
 }, { _id: false })
 
@@ -23,16 +24,48 @@ const BankDataSchema = new Schema({
 }, { _id: false })
 
 const PositionSchema = new Schema({
-  lender: String,
+  lender: String, // Will be encrypted
   payment: Number,
   frequency: { type: String, enum: ['Daily', 'Weekly', 'Monthly'] },
   estimatedBalance: Number,
 }, { _id: false })
 
+const ChatMessageSchema = new Schema({
+  id: { type: String, required: true },
+  role: { type: String, enum: ['user', 'assistant'], required: true },
+  content: { type: String, required: true },
+  timestamp: { type: String, required: true },
+}, { _id: false })
+
+const InternalTransferSchema = new Schema({
+  fromAccountId: String,
+  toAccountId: String,
+  amount: Number,
+  date: String,
+  description: String, // Will be encrypted
+}, { _id: false })
+
+const BankAccountSchema = new Schema({
+  id: { type: String, required: true },
+  accountNumber: { type: String, default: '' }, // Will be encrypted
+  accountName: { type: String, default: '' }, // Will be encrypted
+  bankName: { type: String, default: null }, // Will be encrypted
+  pdfFileName: { type: String, required: true },
+  koncileTaskId: { type: String, default: null },
+  koncileDocumentId: { type: Number, default: null },
+  extractionStatus: {
+    type: String,
+    enum: ['pending', 'processing', 'done', 'failed'],
+    default: 'pending',
+  },
+  bankData: { type: BankDataSchema, required: true },
+  internalTransfers: { type: [InternalTransferSchema], default: [] },
+}, { _id: false })
+
 const DealSchema = new Schema({
   _id: { type: String, required: true },
-  businessName: { type: String, default: '' },
-  ownerName: { type: String, default: '' },
+  businessName: { type: String, default: '' }, // Will be encrypted
+  ownerName: { type: String, default: '' }, // Will be encrypted
   amountRequested: { type: Number, default: 0 },
   dateSubmitted: { type: String, default: () => new Date().toISOString() },
   status: {
@@ -41,10 +74,12 @@ const DealSchema = new Schema({
     default: 'pending',
   },
   industry: { type: String, default: '' },
-  broker: { type: String, default: null },
-  notes: { type: String, default: null },
+  broker: { type: String, default: null }, // Will be encrypted
+  notes: { type: String, default: null }, // Will be encrypted
   aiSummary: { type: String, default: null },
+  chatHistory: { type: [ChatMessageSchema], default: [] },
   bankData: { type: BankDataSchema, default: null },
+  bankAccounts: { type: [BankAccountSchema], default: [] },
   existingPositions: { type: [PositionSchema], default: [] },
   koncileTaskId: { type: String, default: null },
   koncileDocumentId: { type: Number, default: null },
@@ -60,29 +95,160 @@ const DealSchema = new Schema({
   _id: false, // We manage our own _id
 })
 
+/**
+ * Encrypt sensitive fields before saving to database
+ */
+DealSchema.pre('save', function(next) {
+  try {
+    // Encrypt top-level fields
+    if (this.businessName) this.businessName = encrypt(this.businessName)
+    if (this.ownerName) this.ownerName = encrypt(this.ownerName)
+    if (this.broker) this.broker = encrypt(this.broker)
+    if (this.notes) this.notes = encrypt(this.notes)
+
+    // Encrypt bank accounts
+    if (this.bankAccounts && this.bankAccounts.length > 0) {
+      this.bankAccounts = this.bankAccounts.map((account: any) => ({
+        ...account,
+        accountNumber: account.accountNumber ? encrypt(account.accountNumber) : '',
+        accountName: account.accountName ? encrypt(account.accountName) : '',
+        bankName: account.bankName ? encrypt(account.bankName) : null,
+        bankData: {
+          ...account.bankData,
+          transactions: account.bankData.transactions.map((tx: any) => ({
+            ...tx,
+            description: tx.description ? encrypt(tx.description) : '',
+          })),
+        },
+        internalTransfers: account.internalTransfers.map((transfer: any) => ({
+          ...transfer,
+          description: transfer.description ? encrypt(transfer.description) : '',
+        })),
+      }))
+    }
+
+    // Encrypt legacy bank data transactions
+    if (this.bankData && this.bankData.transactions) {
+      this.bankData.transactions = this.bankData.transactions.map((tx: any) => ({
+        ...tx,
+        description: tx.description ? encrypt(tx.description) : '',
+      }))
+    }
+
+    // Encrypt existing positions
+    if (this.existingPositions && this.existingPositions.length > 0) {
+      this.existingPositions = this.existingPositions.map((pos: any) => ({
+        ...pos,
+        lender: pos.lender ? encrypt(pos.lender) : '',
+      }))
+    }
+
+    next()
+  } catch (error) {
+    next(error as Error)
+  }
+})
+
+/**
+ * Decrypt sensitive fields after retrieving from database
+ */
+function decryptDeal(doc: any) {
+  if (!doc) return doc
+
+  try {
+    // Decrypt top-level fields
+    if (doc.businessName) doc.businessName = decrypt(doc.businessName)
+    if (doc.ownerName) doc.ownerName = decrypt(doc.ownerName)
+    if (doc.broker) doc.broker = decrypt(doc.broker)
+    if (doc.notes) doc.notes = decrypt(doc.notes)
+
+    // Decrypt bank accounts
+    if (doc.bankAccounts && doc.bankAccounts.length > 0) {
+      doc.bankAccounts = doc.bankAccounts.map((account: any) => ({
+        ...account,
+        accountNumber: account.accountNumber ? decrypt(account.accountNumber) : '',
+        accountName: account.accountName ? decrypt(account.accountName) : '',
+        bankName: account.bankName ? decrypt(account.bankName) : null,
+        bankData: {
+          ...account.bankData,
+          transactions: account.bankData.transactions.map((tx: any) => ({
+            ...tx,
+            description: tx.description ? decrypt(tx.description) : '',
+          })),
+        },
+        internalTransfers: account.internalTransfers.map((transfer: any) => ({
+          ...transfer,
+          description: transfer.description ? decrypt(transfer.description) : '',
+        })),
+      }))
+    }
+
+    // Decrypt legacy bank data transactions
+    if (doc.bankData && doc.bankData.transactions) {
+      doc.bankData.transactions = doc.bankData.transactions.map((tx: any) => ({
+        ...tx,
+        description: tx.description ? decrypt(tx.description) : '',
+      }))
+    }
+
+    // Decrypt existing positions
+    if (doc.existingPositions && doc.existingPositions.length > 0) {
+      doc.existingPositions = doc.existingPositions.map((pos: any) => ({
+        ...pos,
+        lender: pos.lender ? decrypt(pos.lender) : '',
+      }))
+    }
+  } catch (error) {
+    console.error('Decryption error in deal:', error)
+    // Return doc as-is if decryption fails (backward compatibility)
+  }
+
+  return doc
+}
+
+// Apply decryption after find operations
+DealSchema.post('find', function(docs: any[]) {
+  if (docs && docs.length > 0) {
+    return docs.map(decryptDeal)
+  }
+  return docs
+})
+
+DealSchema.post('findOne', function(doc: any) {
+  return decryptDeal(doc)
+})
+
+DealSchema.post('findOneAndUpdate', function(doc: any) {
+  return decryptDeal(doc)
+})
+
 // Helper to convert document to Deal type
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function docToDeal(doc: any): Deal {
-  const obj = doc.toObject()
+  // Decrypt before converting
+  const decrypted = decryptDeal(doc.toObject ? doc.toObject() : doc)
+
   return {
-    id: obj._id,
-    businessName: obj.businessName,
-    ownerName: obj.ownerName,
-    amountRequested: obj.amountRequested,
-    dateSubmitted: obj.dateSubmitted,
-    status: obj.status,
-    industry: obj.industry,
-    broker: obj.broker,
-    notes: obj.notes,
-    aiSummary: obj.aiSummary,
-    bankData: obj.bankData,
-    existingPositions: obj.existingPositions || [],
-    koncileTaskId: obj.koncileTaskId,
-    koncileDocumentId: obj.koncileDocumentId,
-    extractionStatus: obj.extractionStatus,
-    pdfFileName: obj.pdfFileName,
-    createdAt: obj.createdAt,
-    updatedAt: obj.updatedAt,
+    id: decrypted._id,
+    businessName: decrypted.businessName,
+    ownerName: decrypted.ownerName,
+    amountRequested: decrypted.amountRequested,
+    dateSubmitted: decrypted.dateSubmitted,
+    status: decrypted.status,
+    industry: decrypted.industry,
+    broker: decrypted.broker,
+    notes: decrypted.notes,
+    aiSummary: decrypted.aiSummary,
+    chatHistory: decrypted.chatHistory || [],
+    bankData: decrypted.bankData,
+    bankAccounts: decrypted.bankAccounts || [],
+    existingPositions: decrypted.existingPositions || [],
+    koncileTaskId: decrypted.koncileTaskId,
+    koncileDocumentId: decrypted.koncileDocumentId,
+    extractionStatus: decrypted.extractionStatus,
+    pdfFileName: decrypted.pdfFileName,
+    createdAt: decrypted.createdAt,
+    updatedAt: decrypted.updatedAt,
   }
 }
 

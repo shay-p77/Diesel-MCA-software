@@ -9,7 +9,9 @@ export interface Deal {
   broker: string | null
   notes: string | null
   aiSummary: string | null
-  bankData: BankData | null
+  chatHistory: ChatMessage[]
+  bankData: BankData | null // Legacy - for backward compatibility
+  bankAccounts: BankAccount[] // New multi-account support
   existingPositions: Position[]
   koncileTaskId: string | null
   koncileDocumentId: number | null
@@ -17,6 +19,19 @@ export interface Deal {
   pdfFileName: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface BankAccount {
+  id: string
+  accountNumber: string
+  accountName: string
+  bankName: string | null
+  pdfFileName: string
+  koncileTaskId: string | null
+  koncileDocumentId: number | null
+  extractionStatus: 'pending' | 'processing' | 'done' | 'failed'
+  bankData: BankData
+  internalTransfers: InternalTransfer[]
 }
 
 export interface BankData {
@@ -30,6 +45,14 @@ export interface BankData {
   negativeDays: number
   monthsOfStatements: number
   transactions: Transaction[]
+}
+
+export interface InternalTransfer {
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  date: string
+  description: string
 }
 
 export interface Transaction {
@@ -52,4 +75,21 @@ export interface ChatMessage {
   role: 'user' | 'assistant'
   content: string
   timestamp: string
+}
+
+export interface User {
+  id: string
+  email: string
+  name: string
+  role: 'admin' | 'user'
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
+  passwordSetup: boolean
+  invitationExpiry?: Date | null
+}
+
+export interface AuthResponse {
+  token: string
+  user: User
 }

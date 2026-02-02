@@ -103,6 +103,22 @@
   line-height: 1.5;
 }
 
+.extraction-badge {
+  display: inline-block;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.extraction-badge.done {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
 .deal-indicators {
   display: flex;
   flex-direction: column;

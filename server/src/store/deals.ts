@@ -30,6 +30,7 @@ export async function createDeal(data: {
     status: 'pending',
     aiSummary: null,
     bankData: null,
+    bankAccounts: [],
     existingPositions: [],
     koncileTaskId: null,
     koncileDocumentId: null,

@@ -16,7 +16,7 @@ export default function DealModal({ isOpen, onClose, onSave, deal }: DealModalPr
   const [dateSubmitted, setDateSubmitted] = useState('')
   const [broker, setBroker] = useState('')
   const [notes, setNotes] = useState('')
-  const [pdfFile, setPdfFile] = useState<File | null>(null)
+  const [pdfFiles, setPdfFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -48,23 +48,28 @@ export default function DealModal({ isOpen, onClose, onSave, deal }: DealModalPr
       setDateSubmitted(deal.dateSubmitted ? deal.dateSubmitted.split('T')[0] : '')
       setBroker(deal.broker || '')
       setNotes(deal.notes || '')
-      setPdfFile(null)
+      setPdfFiles([])
     } else {
       setBusinessName('')
       setAmountRequested('')
       setDateSubmitted(new Date().toISOString().split('T')[0])
       setBroker('')
       setNotes('')
-      setPdfFile(null)
+      setPdfFiles([])
     }
     setError(null)
   }, [deal, isOpen])
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file && file.type === 'application/pdf') {
-      setPdfFile(file)
+    const files = e.target.files
+    if (files) {
+      const pdfFiles = Array.from(files).filter(file => file.type === 'application/pdf')
+      setPdfFiles(prev => [...prev, ...pdfFiles])
     }
+  }
+
+  const removeFile = (index: number) => {
+    setPdfFiles(prev => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -90,8 +95,8 @@ export default function DealModal({ isOpen, onClose, onSave, deal }: DealModalPr
         savedDeal = await api.createDeal(dealData)
       }
 
-      if (pdfFile) {
-        const uploadResult = await api.uploadPdf(savedDeal.id, pdfFile)
+      if (pdfFiles.length > 0) {
+        const uploadResult = await api.uploadPdfs(savedDeal.id, pdfFiles)
         savedDeal = uploadResult.deal
       }
 
@@ -174,40 +179,46 @@ export default function DealModal({ isOpen, onClose, onSave, deal }: DealModalPr
             </div>
 
             <div className="form-group">
-              <label>Bank Statement PDF</label>
+              <label>Bank Statement PDFs</label>
               <input
                 type="file"
                 ref={fileInputRef}
                 accept=".pdf"
+                multiple
                 onChange={handleFileSelect}
                 style={{ display: 'none' }}
                 id="pdf-file"
               />
               <div className="file-upload-area">
-                {pdfFile ? (
-                  <div className="file-selected">
-                    <span className="file-icon">PDF</span>
-                    <span className="file-name">{pdfFile.name}</span>
-                    <button
-                      type="button"
-                      className="file-remove"
-                      onClick={() => {
-                        setPdfFile(null)
-                        if (fileInputRef.current) fileInputRef.current.value = ''
-                      }}
-                    >
-                      &times;
-                    </button>
-                  </div>
-                ) : deal?.pdfFileName ? (
-                  <div className="file-existing">
-                    <span className="file-icon">PDF</span>
-                    <span className="file-name">{deal.pdfFileName}</span>
-                    <span className="file-status">Uploaded</span>
+                {pdfFiles.length > 0 || (deal?.bankAccounts && deal.bankAccounts.length > 0) ? (
+                  <div className="files-list">
+                    {pdfFiles.map((file, index) => (
+                      <div key={index} className="file-selected">
+                        <span className="file-icon">PDF</span>
+                        <span className="file-name">{file.name}</span>
+                        <button
+                          type="button"
+                          className="file-remove"
+                          onClick={() => removeFile(index)}
+                        >
+                          &times;
+                        </button>
+                      </div>
+                    ))}
+                    {deal?.bankAccounts && deal.bankAccounts.map((account, index) => (
+                      <div key={`existing-${index}`} className="file-existing">
+                        <span className="file-icon">PDF</span>
+                        <span className="file-name">{account.pdfFileName}</span>
+                        <span className="file-status">Uploaded</span>
+                      </div>
+                    ))}
+                    <label htmlFor="pdf-file" className="file-label-add">
+                      <span>+ Add more PDFs</span>
+                    </label>
                   </div>
                 ) : (
                   <label htmlFor="pdf-file" className="file-label">
-                    <span>Click to upload PDF</span>
+                    <span>Click to upload PDFs (multiple allowed)</span>
                   </label>
                 )}
               </div>

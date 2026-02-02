@@ -15,6 +15,17 @@ export default function DealCard({ deal }: DealCardProps) {
     .filter(p => p.frequency === 'Daily')
     .reduce((sum, p) => sum + p.payment, 0)
 
+  // Calculate total transactions from all accounts or use legacy data
+  const hasMultipleAccounts = deal.bankAccounts && deal.bankAccounts.length > 0
+  const totalTransactions = hasMultipleAccounts
+    ? deal.bankAccounts.reduce((sum, acc) => sum + acc.bankData.transactions.length, 0)
+    : deal.bankData?.transactions?.length || 0
+
+  // Calculate total NSFs from all accounts or use legacy data
+  const totalNSFs = hasMultipleAccounts
+    ? deal.bankAccounts.reduce((sum, acc) => sum + acc.bankData.nsfs, 0)
+    : deal.bankData?.nsfs || 0
+
   return (
     <div className="deal-card" onClick={() => navigate(`/deal/${deal.id}`)}>
       <div className="deal-main">
@@ -37,10 +48,17 @@ export default function DealCard({ deal }: DealCardProps) {
         <p className="deal-summary">
           {deal.aiSummary || (deal.extractionStatus === 'processing'
             ? 'Processing bank statement...'
+            : deal.extractionStatus === 'done'
+            ? `${totalTransactions} transactions extracted`
+            : deal.pdfFileName
+            ? 'Bank statement uploaded - awaiting extraction'
             : 'Upload bank statement for AI analysis')}
         </p>
         {deal.extractionStatus === 'processing' && (
           <span className="extraction-badge">Extracting data...</span>
+        )}
+        {deal.extractionStatus === 'done' && (
+          <span className="extraction-badge done">✓ Extracted</span>
         )}
       </div>
 
@@ -49,8 +67,8 @@ export default function DealCard({ deal }: DealCardProps) {
           <span className="indicator-value">{positionCount}</span>
           <span className="indicator-label">Positions</span>
         </div>
-        <div className={`indicator ${deal.bankData?.nsfs === 0 ? 'good' : deal.bankData?.nsfs! <= 2 ? 'warning' : 'danger'}`}>
-          <span className="indicator-value">{deal.bankData?.nsfs || 0}</span>
+        <div className={`indicator ${totalNSFs === 0 ? 'good' : totalNSFs <= 2 ? 'warning' : 'danger'}`}>
+          <span className="indicator-value">{totalNSFs}</span>
           <span className="indicator-label">NSFs</span>
         </div>
         <div className="indicator">

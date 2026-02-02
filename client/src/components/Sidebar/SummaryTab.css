@@ -3,7 +3,6 @@
   display: flex;
   flex-direction: column;
   gap: 1rem;
-  overflow-y: auto;
 }
 
 /* View Toggle */
@@ -285,6 +284,125 @@
   color: #16a34a;
   font-size: 0.875rem;
   padding: 0.5rem 0;
+}
+
+/* Multi-Account Styles */
+.bank-account-section {
+  background: #f8f9fa;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+  overflow: hidden;
+}
+
+.account-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
+  transition: background 0.2s;
+}
+
+.account-header:hover {
+  background: #fafafa;
+}
+
+.account-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.account-info h5 {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+}
+
+.bank-name {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.account-number {
+  font-size: 0.75rem;
+  color: #999;
+  font-family: 'Courier New', monospace;
+}
+
+.extraction-status {
+  font-size: 1rem;
+  padding: 0.25rem;
+}
+
+.extraction-status.done {
+  color: #16a34a;
+}
+
+.extraction-status.processing {
+  color: #f59e0b;
+}
+
+.extraction-status.failed {
+  color: #dc2626;
+}
+
+.account-details {
+  padding: 0.75rem 1rem;
+  background: white;
+}
+
+.internal-transfers-list {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.internal-transfers-list h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #666;
+  text-transform: uppercase;
+}
+
+.transfer-item {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 4px;
+  margin-bottom: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.transfer-amount {
+  font-weight: 600;
+  color: #1e40af;
+  min-width: 80px;
+}
+
+.transfer-date {
+  color: #666;
+  min-width: 90px;
+}
+
+.transfer-desc {
+  color: #333;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cell-value.info {
+  color: #1e40af;
 }
 
 

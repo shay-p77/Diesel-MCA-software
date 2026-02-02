@@ -9,14 +9,29 @@ export interface Deal {
   broker: string | null
   notes: string | null
   aiSummary: string | null
-  bankData: BankData | null
+  chatHistory: ChatMessage[]
+  bankData: BankData | null // Legacy - for backward compatibility
+  bankAccounts: BankAccount[] // New multi-account support
   existingPositions: Position[]
-  koncileTaskId: string | null
-  koncileDocumentId: number | null
+  koncileTaskId: string | null // Legacy - kept for backward compatibility
+  koncileDocumentId: number | null // Legacy - kept for backward compatibility
   extractionStatus: 'pending' | 'processing' | 'done' | 'failed' | null
-  pdfFileName: string | null
+  pdfFileName: string | null // Legacy - kept for backward compatibility
   createdAt: string
   updatedAt: string
+}
+
+export interface BankAccount {
+  id: string // Unique identifier for this account
+  accountNumber: string // Last 4 digits or account identifier
+  accountName: string // E.g., "Checking Account", "Savings Account"
+  bankName: string | null // E.g., "Chase", "Bank of America"
+  pdfFileName: string
+  koncileTaskId: string | null
+  koncileDocumentId: number | null
+  extractionStatus: 'pending' | 'processing' | 'done' | 'failed'
+  bankData: BankData
+  internalTransfers: InternalTransfer[] // Detected transfers between accounts
 }
 
 export interface BankData {
@@ -30,6 +45,14 @@ export interface BankData {
   negativeDays: number
   monthsOfStatements: number
   transactions: Transaction[]
+}
+
+export interface InternalTransfer {
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  date: string
+  description: string
 }
 
 export interface Transaction {
@@ -67,4 +90,38 @@ export interface CreateDealRequest {
 export interface ChatRequest {
   message: string
   history?: ChatMessage[]
+}
+
+export interface User {
+  id: string
+  email: string
+  name: string
+  role: 'admin' | 'user'
+  createdAt: string
+  updatedAt: string
+  createdBy?: string
+  passwordSetup: boolean
+  invitationExpiry?: Date | null
+}
+
+export interface LoginRequest {
+  email: string
+  password: string
+}
+
+export interface RegisterRequest {
+  email: string
+  password?: string
+  name: string
+  role?: 'admin' | 'user'
+}
+
+export interface SetupPasswordRequest {
+  token: string
+  password: string
+}
+
+export interface AuthResponse {
+  token: string
+  user: User
 }

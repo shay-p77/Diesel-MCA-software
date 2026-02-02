@@ -13,19 +13,23 @@ export default function ChatTab({ deal }: ChatTabProps) {
   const [loading, setLoading] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
 
-  // Initialize with a welcome message
+  // Load chat history from deal or initialize with welcome message
   useEffect(() => {
-    const hasData = deal.bankData && deal.extractionStatus === 'done'
-    const welcomeMessage: ChatMessage = {
-      id: '1',
-      role: 'assistant',
-      content: hasData
-        ? `I've analyzed the bank statements for ${deal.businessName}. I can help you understand the financials, identify risks, or answer any questions about this deal. What would you like to know?`
-        : `I'm ready to help analyze ${deal.businessName} once bank statement data is extracted. Upload a PDF to get started, or ask me general questions about the deal.`,
-      timestamp: new Date().toISOString()
+    if (deal.chatHistory && deal.chatHistory.length > 0) {
+      setMessages(deal.chatHistory)
+    } else {
+      const hasData = deal.bankData && deal.extractionStatus === 'done'
+      const welcomeMessage: ChatMessage = {
+        id: '1',
+        role: 'assistant',
+        content: hasData
+          ? `I've analyzed the bank statements for ${deal.businessName}. I can help you understand the financials, identify risks, or answer any questions about this deal. What would you like to know?`
+          : `I'm ready to help analyze ${deal.businessName} once bank statement data is extracted. Upload a PDF to get started, or ask me general questions about the deal.`,
+        timestamp: new Date().toISOString()
+      }
+      setMessages([welcomeMessage])
     }
-    setMessages([welcomeMessage])
-  }, [deal.businessName, deal.extractionStatus])
+  }, [deal.id, deal.chatHistory])
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -47,16 +51,22 @@ export default function ChatTab({ deal }: ChatTabProps) {
     setLoading(true)
 
     try {
-      // Build history for context (exclude the initial welcome message)
-      const history = messages.slice(1).map(m => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp
-      }))
+      // Build history for context (exclude the initial welcome message if it's the only one)
+      const history = messages.length === 1 && messages[0].id === '1'
+        ? []
+        : messages.map(m => ({
+            id: m.id,
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp
+          }))
 
       const response = await api.sendChatMessage(deal.id, input, history)
-      setMessages(prev => [...prev, response])
+      setMessages(prev => {
+        const newMessages = [...prev, response]
+        // Note: Chat history is now saved on the backend automatically
+        return newMessages
+      })
     } catch (err: any) {
       const errorMessage = err.message || 'Failed to get response'
 

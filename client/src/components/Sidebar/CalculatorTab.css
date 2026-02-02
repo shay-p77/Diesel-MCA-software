@@ -208,3 +208,156 @@
   border-color: #3d6b99;
   background: #f0f5fa;
 }
+
+/* Deal Info Section */
+.info-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.info-item .label {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.info-item .value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #333;
+}
+
+/* Positions Section */
+.positions-section h4 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auto-detected-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: #16a34a;
+  color: white;
+  font-size: 0.625rem;
+  font-weight: 600;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.positions-section h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #555;
+  text-transform: uppercase;
+}
+
+.position-group {
+  margin-bottom: 1rem;
+}
+
+.position-group:last-child {
+  margin-bottom: 0;
+}
+
+.positions-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.positions-table thead th {
+  text-align: left;
+  padding: 0.5rem;
+  background: #e9ecef;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.positions-table tbody td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.positions-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.no-positions {
+  font-size: 0.75rem;
+  color: #888;
+  font-style: italic;
+  margin: 0;
+}
+
+/* Key Metrics Section */
+.metrics-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.metric-item.highlight {
+  background: #e7f3ff;
+  border: 1px solid #3d6b99;
+  font-weight: 600;
+}
+
+.metric-item .label {
+  color: #666;
+  flex: 1;
+}
+
+.metric-item .value {
+  font-weight: 600;
+  color: #3d6b99;
+  white-space: nowrap;
+}
+
+/* Monthly Revenues Section */
+.revenues-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.revenue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.revenue-item .month-label {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.revenue-item .revenue-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #16a34a;
+}

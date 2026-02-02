@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import cors from 'cors'
 import dealsRouter from './routes/deals.js'
+import authRouter from './routes/auth.js'
 import { seedDemoData } from './store/deals.js'
 import { connectToDatabase, isConnected } from './db/connection.js'
 import { getKoncileService } from './services/koncile.js'
@@ -14,6 +15,7 @@ app.use(cors())
 app.use(express.json())
 
 // Routes
+app.use('/api/auth', authRouter)
 app.use('/api/deals', dealsRouter)
 
 // Health check
@@ -58,6 +60,10 @@ async function start() {
     console.log('')
     console.log('Endpoints:')
     console.log(`  GET  /api/health`)
+    console.log(`  POST /api/auth/login`)
+    console.log(`  POST /api/auth/register`)
+    console.log(`  GET  /api/auth/me`)
+    console.log(`  GET  /api/auth/users`)
     console.log(`  GET  /api/deals`)
     console.log(`  POST /api/deals`)
     console.log(`  GET  /api/deals/:id`)
@@ -66,8 +72,8 @@ async function start() {
     console.log(`  POST /api/deals/:id/chat`)
     console.log('')
 
-    // Seed demo data if empty
-    await seedDemoData()
+    // Seed demo data if empty (disabled)
+    // await seedDemoData()
   })
 }
 

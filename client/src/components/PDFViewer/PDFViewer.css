@@ -1,0 +1,290 @@
+.pdf-viewer-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #525659;
+}
+
+.pdf-toolbar {
+  background: #3d4043;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-bottom: 1px solid #525659;
+}
+
+.search-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+  min-width: 300px;
+}
+
+.search-input-wrapper {
+  position: relative;
+  flex: 1;
+  max-width: 300px;
+}
+
+.pdf-search-input {
+  padding: 0.5rem 2rem 0.5rem 0.75rem;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  background: #525659;
+  color: white;
+  width: 100%;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 0.25rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: #999;
+  font-size: 1.5rem;
+  cursor: pointer;
+  padding: 0 0.5rem;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.search-clear-btn:hover {
+  color: #fff;
+}
+
+.pdf-search-input::placeholder {
+  color: #999;
+}
+
+.pdf-search-input:focus {
+  outline: 2px solid #3d6b99;
+}
+
+.search-btn {
+  background: #3d6b99;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.search-btn:hover {
+  background: #2d5a88;
+}
+
+.search-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #525659;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.search-nav button {
+  background: none;
+  border: none;
+  color: white;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  font-size: 1rem;
+}
+
+.search-nav button:hover {
+  background: #626669;
+}
+
+.search-nav span {
+  color: #ccc;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.pdf-controls {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.pdf-controls button {
+  background: #525659;
+  border: none;
+  color: white;
+  padding: 0.5rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.pdf-controls button:hover:not(:disabled) {
+  background: #626669;
+}
+
+.pdf-controls button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pdf-controls span {
+  color: #ccc;
+  font-size: 0.875rem;
+  padding: 0 0.5rem;
+  white-space: nowrap;
+}
+
+.page-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #525659;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+}
+
+.page-controls button {
+  padding: 0.25rem 0.5rem;
+}
+
+.page-controls span {
+  padding: 0 0.25rem;
+}
+
+.highlight-btn {
+  background: #f59e0b !important;
+  font-weight: 500;
+}
+
+.highlight-btn.active {
+  background: #d97706 !important;
+  box-shadow: 0 0 0 2px #fbbf24;
+}
+
+.highlight-btn:hover {
+  background: #f59e0b !important;
+}
+
+.erase-btn {
+  background: #ef4444 !important;
+  font-weight: 500;
+}
+
+.erase-btn:hover:not(:disabled) {
+  background: #dc2626 !important;
+}
+
+.pdf-document {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  padding: 2rem;
+  background: #525659;
+}
+
+.pdf-document .react-pdf__Document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.pdf-document .react-pdf__Page {
+  background: white;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  margin-bottom: 1rem;
+}
+
+.pdf-document .react-pdf__Page canvas {
+  max-width: 100%;
+  height: auto !important;
+}
+
+.pdf-loading,
+.pdf-error {
+  color: white;
+  text-align: center;
+  padding: 2rem;
+  font-size: 1rem;
+}
+
+.pdf-error {
+  color: #f87171;
+}
+
+/* Highlight overlay */
+.pdf-document ::selection {
+  background: rgba(255, 235, 59, 0.6);
+  color: inherit;
+}
+
+.pdf-document ::-moz-selection {
+  background: rgba(255, 235, 59, 0.6);
+  color: inherit;
+}
+
+.pdf-document.highlight-active ::selection {
+  background: rgba(255, 193, 7, 0.8);
+  color: #000;
+}
+
+.pdf-document.highlight-active ::-moz-selection {
+  background: rgba(255, 193, 7, 0.8);
+  color: #000;
+}
+
+/* Highlights bar */
+.highlights-bar {
+  background: #3d4043;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #525659;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-height: 80px;
+  overflow-y: auto;
+}
+
+.highlights-label {
+  color: #ccc;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.highlights-list {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  flex: 1;
+  overflow-x: auto;
+}
+
+.highlight-chip {
+  background: rgba(255, 193, 7, 0.3);
+  color: #fff;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  border: 1px solid rgba(255, 193, 7, 0.5);
+  white-space: nowrap;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Search highlight from mark.js */
+mark.search-highlight {
+  background: rgba(255, 235, 59, 0.8);
+  color: inherit;
+  padding: 0;
+  font-weight: 500;
+}

@@ -192,6 +192,7 @@
   flex-direction: column;
   background: #525659;
   min-height: 0;
+  overflow: hidden;
 }
 
 .pdf-toolbar {
@@ -249,14 +250,51 @@
 .pdf-container {
   flex: 1;
   display: flex;
-  align-items: center;
+  flex-direction: column;
   justify-content: center;
-  overflow: auto;
+  align-items: center;
+  overflow: hidden;
+}
+
+.pdf-header {
+  background: #3d4043;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #525659;
+}
+
+.pdf-header .pdf-filename {
+  color: white;
+  font-weight: 500;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.pdf-header .extraction-status {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  margin: 0;
+}
+
+.pdf-iframe {
+  flex: 1;
+  width: 100%;
+  border: none;
+  background: white;
 }
 
 .pdf-placeholder {
   text-align: center;
   color: #999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 500px;
 }
 
 .pdf-icon {
@@ -290,6 +328,60 @@
   justify-content: center;
   color: #666;
   font-size: 1rem;
+}
+
+/* Account Selector */
+.account-selector {
+  background: #3d4043;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-bottom: 1px solid #525659;
+}
+
+.account-selector label {
+  color: #ccc;
+  font-size: 0.875rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.account-selector select {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #525659;
+  border-radius: 4px;
+  background: #525659;
+  color: white;
+  font-size: 0.875rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.account-selector select:hover {
+  background: #626669;
+}
+
+.account-selector select:focus {
+  outline: 2px solid #3d6b99;
+}
+
+.btn-add-account {
+  padding: 0.5rem 1rem;
+  background: #3d6b99;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
+.btn-add-account:hover {
+  background: #2d5a88;
 }
 
 /* PDF Upload Area */
@@ -368,7 +460,10 @@
   display: flex;
   flex-direction: column;
   border-left: 1px solid #e0e0e0;
-  min-height: 0;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  align-self: flex-start;
 }
 
 .sidebar-tabs {
@@ -401,7 +496,7 @@
 
 .sidebar-content {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
