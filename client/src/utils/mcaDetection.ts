@@ -159,17 +159,13 @@ function analyzePattern(group: TransactionGroup): DetectedPattern | null {
   // Determine frequency
   const avgInterval = intervals.reduce((sum, i) => sum + i, 0) / intervals.length
   let frequency: 'Daily' | 'Weekly' | 'Monthly'
-  let expectedInterval: number
 
   if (avgInterval <= 2 && isWeekdayOnly) {
     frequency = 'Daily'
-    expectedInterval = 1
   } else if (avgInterval >= 6 && avgInterval <= 8) {
     frequency = 'Weekly'
-    expectedInterval = 7
   } else if (avgInterval >= 28 && avgInterval <= 32) {
     frequency = 'Monthly'
-    expectedInterval = 30
   } else {
     // Doesn't match a clear pattern
     return null

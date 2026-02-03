@@ -98,7 +98,7 @@ const DealSchema = new Schema({
 /**
  * Encrypt sensitive fields before saving to database
  */
-DealSchema.pre('save', function(next) {
+DealSchema.pre('save', function(next: any) {
   try {
     // Encrypt top-level fields
     if (this.businessName) this.businessName = encrypt(this.businessName)
@@ -106,41 +106,44 @@ DealSchema.pre('save', function(next) {
     if (this.broker) this.broker = encrypt(this.broker)
     if (this.notes) this.notes = encrypt(this.notes)
 
-    // Encrypt bank accounts
+    // Encrypt bank accounts - iterate in place
     if (this.bankAccounts && this.bankAccounts.length > 0) {
-      this.bankAccounts = this.bankAccounts.map((account: any) => ({
-        ...account,
-        accountNumber: account.accountNumber ? encrypt(account.accountNumber) : '',
-        accountName: account.accountName ? encrypt(account.accountName) : '',
-        bankName: account.bankName ? encrypt(account.bankName) : null,
-        bankData: {
-          ...account.bankData,
-          transactions: account.bankData.transactions.map((tx: any) => ({
-            ...tx,
-            description: tx.description ? encrypt(tx.description) : '',
-          })),
-        },
-        internalTransfers: account.internalTransfers.map((transfer: any) => ({
-          ...transfer,
-          description: transfer.description ? encrypt(transfer.description) : '',
-        })),
-      }))
+      for (let i = 0; i < this.bankAccounts.length; i++) {
+        const account = this.bankAccounts[i] as any
+        if (account.accountNumber) account.accountNumber = encrypt(account.accountNumber)
+        if (account.accountName) account.accountName = encrypt(account.accountName)
+        if (account.bankName) account.bankName = encrypt(account.bankName)
+
+        if (account.bankData && account.bankData.transactions) {
+          for (let j = 0; j < account.bankData.transactions.length; j++) {
+            const tx = account.bankData.transactions[j] as any
+            if (tx.description) tx.description = encrypt(tx.description)
+          }
+        }
+
+        if (account.internalTransfers) {
+          for (let j = 0; j < account.internalTransfers.length; j++) {
+            const transfer = account.internalTransfers[j] as any
+            if (transfer.description) transfer.description = encrypt(transfer.description)
+          }
+        }
+      }
     }
 
     // Encrypt legacy bank data transactions
     if (this.bankData && this.bankData.transactions) {
-      this.bankData.transactions = this.bankData.transactions.map((tx: any) => ({
-        ...tx,
-        description: tx.description ? encrypt(tx.description) : '',
-      }))
+      for (let i = 0; i < this.bankData.transactions.length; i++) {
+        const tx = this.bankData.transactions[i] as any
+        if (tx.description) tx.description = encrypt(tx.description)
+      }
     }
 
     // Encrypt existing positions
     if (this.existingPositions && this.existingPositions.length > 0) {
-      this.existingPositions = this.existingPositions.map((pos: any) => ({
-        ...pos,
-        lender: pos.lender ? encrypt(pos.lender) : '',
-      }))
+      for (let i = 0; i < this.existingPositions.length; i++) {
+        const pos = this.existingPositions[i] as any
+        if (pos.lender) pos.lender = encrypt(pos.lender)
+      }
     }
 
     next()
@@ -164,39 +167,42 @@ function decryptDeal(doc: any) {
 
     // Decrypt bank accounts
     if (doc.bankAccounts && doc.bankAccounts.length > 0) {
-      doc.bankAccounts = doc.bankAccounts.map((account: any) => ({
-        ...account,
-        accountNumber: account.accountNumber ? decrypt(account.accountNumber) : '',
-        accountName: account.accountName ? decrypt(account.accountName) : '',
-        bankName: account.bankName ? decrypt(account.bankName) : null,
-        bankData: {
-          ...account.bankData,
-          transactions: account.bankData.transactions.map((tx: any) => ({
-            ...tx,
-            description: tx.description ? decrypt(tx.description) : '',
-          })),
-        },
-        internalTransfers: account.internalTransfers.map((transfer: any) => ({
-          ...transfer,
-          description: transfer.description ? decrypt(transfer.description) : '',
-        })),
-      }))
+      for (let i = 0; i < doc.bankAccounts.length; i++) {
+        const account = doc.bankAccounts[i]
+        if (account.accountNumber) account.accountNumber = decrypt(account.accountNumber)
+        if (account.accountName) account.accountName = decrypt(account.accountName)
+        if (account.bankName) account.bankName = decrypt(account.bankName)
+
+        if (account.bankData && account.bankData.transactions) {
+          for (let j = 0; j < account.bankData.transactions.length; j++) {
+            const tx = account.bankData.transactions[j]
+            if (tx.description) tx.description = decrypt(tx.description)
+          }
+        }
+
+        if (account.internalTransfers) {
+          for (let j = 0; j < account.internalTransfers.length; j++) {
+            const transfer = account.internalTransfers[j]
+            if (transfer.description) transfer.description = decrypt(transfer.description)
+          }
+        }
+      }
     }
 
     // Decrypt legacy bank data transactions
     if (doc.bankData && doc.bankData.transactions) {
-      doc.bankData.transactions = doc.bankData.transactions.map((tx: any) => ({
-        ...tx,
-        description: tx.description ? decrypt(tx.description) : '',
-      }))
+      for (let i = 0; i < doc.bankData.transactions.length; i++) {
+        const tx = doc.bankData.transactions[i]
+        if (tx.description) tx.description = decrypt(tx.description)
+      }
     }
 
     // Decrypt existing positions
     if (doc.existingPositions && doc.existingPositions.length > 0) {
-      doc.existingPositions = doc.existingPositions.map((pos: any) => ({
-        ...pos,
-        lender: pos.lender ? decrypt(pos.lender) : '',
-      }))
+      for (let i = 0; i < doc.existingPositions.length; i++) {
+        const pos = doc.existingPositions[i]
+        if (pos.lender) pos.lender = decrypt(pos.lender)
+      }
     }
   } catch (error) {
     console.error('Decryption error in deal:', error)
@@ -209,24 +215,24 @@ function decryptDeal(doc: any) {
 // Apply decryption after find operations
 DealSchema.post('find', function(docs: any[]) {
   if (docs && docs.length > 0) {
-    return docs.map(decryptDeal)
+    docs.forEach(decryptDeal)
   }
-  return docs
 })
 
 DealSchema.post('findOne', function(doc: any) {
-  return decryptDeal(doc)
+  if (doc) decryptDeal(doc)
 })
 
 DealSchema.post('findOneAndUpdate', function(doc: any) {
-  return decryptDeal(doc)
+  if (doc) decryptDeal(doc)
 })
 
 // Helper to convert document to Deal type
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function docToDeal(doc: any): Deal {
   // Decrypt before converting
-  const decrypted = decryptDeal(doc.toObject ? doc.toObject() : doc)
+  const obj = doc.toObject ? doc.toObject() : doc
+  const decrypted = decryptDeal(obj)
 
   return {
     id: decrypted._id,

@@ -9,6 +9,24 @@ import { sendUserInvitation, isEmailConfigured } from '../services/email.js'
 const router = Router()
 
 /**
+ * Helper to convert Mongoose User document to User type
+ */
+function docToUser(doc: any): User {
+  const json = doc.toJSON()
+  return {
+    id: json.id,
+    email: json.email,
+    name: json.name,
+    role: json.role,
+    passwordSetup: json.passwordSetup,
+    createdAt: json.createdAt,
+    updatedAt: json.updatedAt,
+    createdBy: json.createdBy,
+    invitationExpiry: json.invitationExpiry,
+  }
+}
+
+/**
  * POST /api/auth/login
  * Login with email and password
  */
@@ -47,7 +65,7 @@ router.post('/login', async (req: Request<{}, {}, LoginRequest>, res: Response) 
     // Return user data (password excluded by toJSON transform)
     const response: AuthResponse = {
       token,
-      user: user.toJSON() as User,
+      user: docToUser(user),
     }
 
     res.json(response)
@@ -106,7 +124,7 @@ router.post('/invite', authenticateToken, requireAdmin, async (req: Request<{}, 
     }
 
     res.status(201).json({
-      ...user.toJSON() as User,
+      ...docToUser(user),
       message: 'Invitation sent successfully'
     })
   } catch (error) {
@@ -160,7 +178,7 @@ router.post('/setup-password', async (req: Request<{}, {}, SetupPasswordRequest>
     // Return user data
     const response: AuthResponse = {
       token: authToken,
-      user: user.toJSON() as User,
+      user: docToUser(user),
     }
 
     res.json(response)
@@ -181,7 +199,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'User not found' })
     }
 
-    res.json(user.toJSON() as User)
+    res.json(docToUser(user))
   } catch (error) {
     console.error('Get user error:', error)
     res.status(500).json({ error: 'Failed to get user info' })
@@ -195,7 +213,7 @@ router.get('/me', authenticateToken, async (req: Request, res: Response) => {
 router.get('/users', authenticateToken, requireAdmin, async (req: Request, res: Response) => {
   try {
     const users = await UserModel.find().sort({ createdAt: -1 })
-    res.json(users.map(u => u.toJSON() as User))
+    res.json(users.map(u => docToUser(u)))
   } catch (error) {
     console.error('Get users error:', error)
     res.status(500).json({ error: 'Failed to get users' })
@@ -247,7 +265,7 @@ router.put('/users/:id', authenticateToken, requireAdmin, async (req: Request, r
       return res.status(404).json({ error: 'User not found' })
     }
 
-    res.json(user.toJSON() as User)
+    res.json(docToUser(user))
   } catch (error) {
     console.error('Update user error:', error)
     res.status(500).json({ error: 'Failed to update user' })

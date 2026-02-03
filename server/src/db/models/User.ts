@@ -56,13 +56,19 @@ const UserSchema = new Schema({
 }, {
   timestamps: true,
   toJSON: {
-    transform: (_doc, ret) => {
-      ret.id = ret._id.toString()
-      delete ret._id
-      delete ret.__v
-      delete ret.password // Never expose password in JSON
-      delete ret.invitationToken // Never expose invitation token
-      return ret
+    transform: (_doc: any, ret: any) => {
+      const transformed: any = {
+        id: ret._id.toString(),
+        email: ret.email,
+        name: ret.name,
+        role: ret.role,
+        passwordSetup: ret.passwordSetup,
+        createdAt: ret.createdAt,
+        updatedAt: ret.updatedAt,
+      }
+      if (ret.createdBy) transformed.createdBy = ret.createdBy
+      if (ret.invitationExpiry) transformed.invitationExpiry = ret.invitationExpiry
+      return transformed
     }
   }
 })

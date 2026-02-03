@@ -1,6 +1,7 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { Document, Page, pdfjs } from 'react-pdf'
 import type { PDFDocumentProxy } from 'pdfjs-dist'
+// @ts-ignore - mark.js doesn't have type definitions
 import Mark from 'mark.js'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
 import 'react-pdf/dist/Page/TextLayer.css'
@@ -14,7 +15,7 @@ interface PDFViewerProps {
   fileName: string
 }
 
-export default function PDFViewer({ pdfUrl, fileName }: PDFViewerProps) {
+export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null)
   const [pageNumber, setPageNumber] = useState(1)
   const [searchText, setSearchText] = useState('')

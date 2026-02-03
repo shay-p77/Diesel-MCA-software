@@ -29,6 +29,7 @@ export async function createDeal(data: {
     dateSubmitted: data.dateSubmitted || now,
     status: 'pending',
     aiSummary: null,
+    chatHistory: [],
     bankData: null,
     bankAccounts: [],
     existingPositions: [],
