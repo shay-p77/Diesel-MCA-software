@@ -51,6 +51,7 @@ const BankAccountSchema = new Schema({
   accountName: { type: String, default: '' }, // Will be encrypted
   bankName: { type: String, default: null }, // Will be encrypted
   pdfFileName: { type: String, required: true },
+  pdfData: { type: String, default: null }, // Base64 encoded PDF stored in MongoDB
   koncileTaskId: { type: String, default: null },
   koncileDocumentId: { type: Number, default: null },
   extractionStatus: {

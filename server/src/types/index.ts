@@ -27,6 +27,7 @@ export interface BankAccount {
   accountName: string // E.g., "Checking Account", "Savings Account"
   bankName: string | null // E.g., "Chase", "Bank of America"
   pdfFileName: string
+  pdfData?: string | null // Base64 encoded PDF stored in MongoDB
   koncileTaskId: string | null
   koncileDocumentId: number | null
   extractionStatus: 'pending' | 'processing' | 'done' | 'failed'

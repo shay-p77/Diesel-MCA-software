@@ -1,20 +1,12 @@
 import { Router, Request, Response } from 'express'
 import multer from 'multer'
 import { v4 as uuidv4 } from 'uuid'
-import path from 'path'
-import fs from 'fs'
 import { createDeal, getDeal, getAllDeals, updateDeal, deleteDeal } from '../store/deals.js'
 import { getKoncileService } from '../services/koncile.js'
 import { getClaudeService } from '../services/claude.js'
 import { CreateDealRequest, ChatRequest } from '../types/index.js'
 
 const router = Router()
-
-// Create uploads directory if it doesn't exist
-const uploadsDir = path.join(process.cwd(), 'uploads')
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true })
-}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -142,11 +134,9 @@ router.post('/:id/upload', upload.array('files', 10), async (req: Request, res: 
         // Generate unique ID for this bank account
         const accountId = uuidv4()
 
-        // Save PDF file to disk with account-specific name
-        const pdfFileName = `${deal.id}_${accountId}.pdf`
-        const pdfPath = path.join(uploadsDir, pdfFileName)
-        fs.writeFileSync(pdfPath, file.buffer)
-        console.log(`PDF saved to ${pdfPath}`)
+        // Convert PDF to base64 for storage in MongoDB
+        const pdfBase64 = file.buffer.toString('base64')
+        console.log(`PDF converted to base64 (${pdfBase64.length} chars)`)
 
         // Upload to Koncile
         console.log(`Sending ${file.originalname} to Koncile API...`)
@@ -163,13 +153,14 @@ router.post('/:id/upload', upload.array('files', 10), async (req: Request, res: 
 
         console.log(`Koncile upload successful. Task ID: ${uploadResult.task_id}`)
 
-        // Create bank account record
+        // Create bank account record with PDF stored in MongoDB
         newBankAccounts.push({
           id: accountId,
           accountNumber: '', // Will be populated from extraction
           accountName: `Account ${i + 1}`, // Temporary name, will be updated from extraction
           bankName: null,
           pdfFileName: file.originalname,
+          pdfData: pdfBase64, // Store PDF in MongoDB instead of file system
           koncileTaskId: uploadResult.task_id,
           koncileDocumentId: null,
           extractionStatus: 'processing' as const,
@@ -628,37 +619,31 @@ router.get('/:id/pdf', async (req: Request, res: Response) => {
       return
     }
 
-    // If using multi-account structure, serve first account's PDF
-    let pdfFileName: string
-    let originalFileName: string
-
+    // If using multi-account structure, serve first account's PDF from MongoDB
     if (deal.bankAccounts && deal.bankAccounts.length > 0) {
       const firstAccount = deal.bankAccounts[0]
-      pdfFileName = `${deal.id}_${firstAccount.id}.pdf`
-      originalFileName = firstAccount.pdfFileName
+
+      if (!firstAccount.pdfData) {
+        res.status(404).json({ error: 'PDF file not found in database' })
+        return
+      }
+
+      // Convert base64 back to buffer
+      const pdfBuffer = Buffer.from(firstAccount.pdfData, 'base64')
+
+      // Set headers for PDF
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader('Content-Disposition', `inline; filename="${firstAccount.pdfFileName}"`)
+      res.setHeader('Access-Control-Allow-Origin', '*')
+      res.setHeader('Access-Control-Allow-Methods', 'GET')
+      res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+      res.setHeader('Content-Length', pdfBuffer.length)
+
+      res.send(pdfBuffer)
     } else {
-      // Legacy single file
-      pdfFileName = `${deal.id}.pdf`
-      originalFileName = deal.pdfFileName || 'document.pdf'
+      // No bank accounts, no PDF
+      res.status(404).json({ error: 'No PDF available for this deal' })
     }
-
-    const pdfPath = path.join(uploadsDir, pdfFileName)
-
-    if (!fs.existsSync(pdfPath)) {
-      res.status(404).json({ error: 'PDF file not found' })
-      return
-    }
-
-    // Set headers for PDF
-    res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="${originalFileName}"`)
-    res.setHeader('Access-Control-Allow-Origin', '*')
-    res.setHeader('Access-Control-Allow-Methods', 'GET')
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
-
-    // Stream the PDF file
-    const fileStream = fs.createReadStream(pdfPath)
-    fileStream.pipe(res)
   } catch (error: any) {
     console.error('PDF serve error:', error)
     res.status(500).json({ error: 'Failed to serve PDF' })
@@ -687,13 +672,13 @@ router.get('/:id/pdf/:accountId', async (req: Request, res: Response) => {
       return
     }
 
-    const pdfFileName = `${deal.id}_${account.id}.pdf`
-    const pdfPath = path.join(uploadsDir, pdfFileName)
-
-    if (!fs.existsSync(pdfPath)) {
-      res.status(404).json({ error: 'PDF file not found' })
+    if (!account.pdfData) {
+      res.status(404).json({ error: 'PDF file not found in database' })
       return
     }
+
+    // Convert base64 back to buffer
+    const pdfBuffer = Buffer.from(account.pdfData, 'base64')
 
     // Set headers for PDF
     res.setHeader('Content-Type', 'application/pdf')
@@ -701,10 +686,9 @@ router.get('/:id/pdf/:accountId', async (req: Request, res: Response) => {
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET')
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')
+    res.setHeader('Content-Length', pdfBuffer.length)
 
-    // Stream the PDF file
-    const fileStream = fs.createReadStream(pdfPath)
-    fileStream.pipe(res)
+    res.send(pdfBuffer)
   } catch (error: any) {
     console.error('PDF serve error:', error)
     res.status(500).json({ error: 'Failed to serve PDF' })
@@ -721,14 +705,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
       return
     }
 
-    // Delete PDF file if exists
-    const pdfFileName = `${deal.id}.pdf`
-    const pdfPath = path.join(uploadsDir, pdfFileName)
-    if (fs.existsSync(pdfPath)) {
-      fs.unlinkSync(pdfPath)
-    }
-
-    // Delete deal from database
+    // Delete deal from database (PDFs are stored in MongoDB, will be deleted with the deal)
     await deleteDeal(req.params.id)
 
     res.json({ message: 'Deal deleted successfully' })
