@@ -117,7 +117,7 @@ export default function CalculatorTab({ deal }: CalculatorTabProps) {
             <span className="value">{deal.businessName}</span>
           </div>
           <div className="info-item">
-            <span className="label">Amount Funded</span>
+            <span className="label">Amount Requested</span>
             <span className="value">${amount.toLocaleString()}</span>
           </div>
           <div className="info-item">
