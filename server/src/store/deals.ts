@@ -73,12 +73,17 @@ export async function getAllDeals(): Promise<Deal[]> {
 
 export async function updateDeal(id: string, updates: Partial<Deal>): Promise<Deal | null> {
   if (isConnected()) {
-    const doc = await DealModel.findByIdAndUpdate(
-      id,
-      { ...updates, updatedAt: new Date().toISOString() },
-      { new: true }
-    )
-    return doc ? docToDeal(doc) : null
+    // Use findById + save to trigger pre-save encryption hook
+    const doc = await DealModel.findById(id)
+    if (!doc) return null
+
+    // Apply updates to the document
+    Object.assign(doc, updates, { updatedAt: new Date().toISOString() })
+
+    // Save triggers pre-save hook which encrypts sensitive data
+    await doc.save()
+
+    return docToDeal(doc)
   }
 
   const deal = memoryStore.get(id)

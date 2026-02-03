@@ -17,12 +17,28 @@ function generateDefaultKey(): string {
 }
 
 /**
+ * Check if a string looks like it's already encrypted
+ */
+export function isEncrypted(text: string): boolean {
+  if (!text) return false
+  const parts = text.split(':')
+  if (parts.length !== 3) return false
+  const [, ivHex, authTagHex] = parts
+  // Check if IV and authTag look like valid hex strings of correct length
+  return /^[0-9a-f]{32}$/i.test(ivHex) && /^[0-9a-f]{32}$/i.test(authTagHex)
+}
+
+/**
  * Encrypt sensitive data using AES-256-GCM
  * Returns: encrypted:iv:authTag format
+ * Skips if data is already encrypted
  */
 export function encrypt(text: string): string {
   try {
     if (!text) return ''
+
+    // Skip if already encrypted (prevent double encryption)
+    if (isEncrypted(text)) return text
 
     // Create random initialization vector
     const iv = crypto.randomBytes(IV_LENGTH)
