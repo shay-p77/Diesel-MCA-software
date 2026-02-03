@@ -98,57 +98,51 @@ const DealSchema = new Schema({
 /**
  * Encrypt sensitive fields before saving to database
  */
-DealSchema.pre('save', function(next: any) {
-  try {
-    // Encrypt top-level fields
-    if (this.businessName) this.businessName = encrypt(this.businessName)
-    if (this.ownerName) this.ownerName = encrypt(this.ownerName)
-    if (this.broker) this.broker = encrypt(this.broker)
-    if (this.notes) this.notes = encrypt(this.notes)
+DealSchema.pre('save', function() {
+  // Encrypt top-level fields
+  if (this.businessName) this.businessName = encrypt(this.businessName)
+  if (this.ownerName) this.ownerName = encrypt(this.ownerName)
+  if (this.broker) this.broker = encrypt(this.broker)
+  if (this.notes) this.notes = encrypt(this.notes)
 
-    // Encrypt bank accounts - iterate in place
-    if (this.bankAccounts && this.bankAccounts.length > 0) {
-      for (let i = 0; i < this.bankAccounts.length; i++) {
-        const account = this.bankAccounts[i] as any
-        if (account.accountNumber) account.accountNumber = encrypt(account.accountNumber)
-        if (account.accountName) account.accountName = encrypt(account.accountName)
-        if (account.bankName) account.bankName = encrypt(account.bankName)
+  // Encrypt bank accounts - iterate in place
+  if (this.bankAccounts && this.bankAccounts.length > 0) {
+    for (let i = 0; i < this.bankAccounts.length; i++) {
+      const account = this.bankAccounts[i] as any
+      if (account.accountNumber) account.accountNumber = encrypt(account.accountNumber)
+      if (account.accountName) account.accountName = encrypt(account.accountName)
+      if (account.bankName) account.bankName = encrypt(account.bankName)
 
-        if (account.bankData && account.bankData.transactions) {
-          for (let j = 0; j < account.bankData.transactions.length; j++) {
-            const tx = account.bankData.transactions[j] as any
-            if (tx.description) tx.description = encrypt(tx.description)
-          }
+      if (account.bankData && account.bankData.transactions) {
+        for (let j = 0; j < account.bankData.transactions.length; j++) {
+          const tx = account.bankData.transactions[j] as any
+          if (tx.description) tx.description = encrypt(tx.description)
         }
+      }
 
-        if (account.internalTransfers) {
-          for (let j = 0; j < account.internalTransfers.length; j++) {
-            const transfer = account.internalTransfers[j] as any
-            if (transfer.description) transfer.description = encrypt(transfer.description)
-          }
+      if (account.internalTransfers) {
+        for (let j = 0; j < account.internalTransfers.length; j++) {
+          const transfer = account.internalTransfers[j] as any
+          if (transfer.description) transfer.description = encrypt(transfer.description)
         }
       }
     }
+  }
 
-    // Encrypt legacy bank data transactions
-    if (this.bankData && this.bankData.transactions) {
-      for (let i = 0; i < this.bankData.transactions.length; i++) {
-        const tx = this.bankData.transactions[i] as any
-        if (tx.description) tx.description = encrypt(tx.description)
-      }
+  // Encrypt legacy bank data transactions
+  if (this.bankData && this.bankData.transactions) {
+    for (let i = 0; i < this.bankData.transactions.length; i++) {
+      const tx = this.bankData.transactions[i] as any
+      if (tx.description) tx.description = encrypt(tx.description)
     }
+  }
 
-    // Encrypt existing positions
-    if (this.existingPositions && this.existingPositions.length > 0) {
-      for (let i = 0; i < this.existingPositions.length; i++) {
-        const pos = this.existingPositions[i] as any
-        if (pos.lender) pos.lender = encrypt(pos.lender)
-      }
+  // Encrypt existing positions
+  if (this.existingPositions && this.existingPositions.length > 0) {
+    for (let i = 0; i < this.existingPositions.length; i++) {
+      const pos = this.existingPositions[i] as any
+      if (pos.lender) pos.lender = encrypt(pos.lender)
     }
-
-    next()
-  } catch (error) {
-    next(error as Error)
   }
 })
 
