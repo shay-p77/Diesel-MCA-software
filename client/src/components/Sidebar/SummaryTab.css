@@ -234,6 +234,12 @@
   color: #991b1b;
 }
 
+.risk-badge.risk-severe {
+  background: #7f1d1d;
+  color: #ffffff;
+  font-weight: 700;
+}
+
 /* Insights List */
 .insights-list {
   list-style: none;

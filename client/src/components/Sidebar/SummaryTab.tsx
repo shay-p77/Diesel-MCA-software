@@ -126,13 +126,45 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
 
   const getRiskLevel = () => {
     let score = 0
+
+    // Check existing positions (stacking)
     if (localDeal.existingPositions.length > 3) score += 3
     else if (localDeal.existingPositions.length > 1) score += 1
+
+    // Check NSFs
     if (primaryBankData?.nsfs && primaryBankData.nsfs > 3) score += 3
     else if (primaryBankData?.nsfs && primaryBankData.nsfs > 0) score += 1
+
+    // Check negative days
     if (primaryBankData?.negativeDays && primaryBankData.negativeDays > 3) score += 2
 
-    if (score >= 5) return { level: 'High Risk', class: 'risk-high' }
+    // Check funding request vs. total deposits ratio
+    const totalDeposits = hasMultipleAccounts
+      ? aggregatedData?.totalDeposits || 0
+      : primaryBankData?.totalDeposits || 0
+
+    if (totalDeposits > 0 && localDeal.amountRequested > 0) {
+      const fundingToDepositsRatio = localDeal.amountRequested / totalDeposits
+      if (fundingToDepositsRatio > 10) score += 5  // Requesting 10x+ their deposits = severe
+      else if (fundingToDepositsRatio > 5) score += 3  // Requesting 5-10x their deposits = high
+      else if (fundingToDepositsRatio > 2) score += 1  // Requesting 2-5x their deposits = moderate
+    }
+
+    // Check if daily deposits can support repayment (MCA typically takes 10-20% of daily)
+    const dailyDeposit = primaryBankData?.dailyAvgDeposit || 0
+    if (dailyDeposit > 0 && localDeal.amountRequested > 0) {
+      // Estimate: if 15% of daily deposits, how many days to repay?
+      const estimatedDailyPayment = dailyDeposit * 0.15
+      const daysToRepay = localDeal.amountRequested / estimatedDailyPayment
+      if (daysToRepay > 365) score += 4  // Would take over a year = severe risk
+      else if (daysToRepay > 180) score += 2  // Would take 6+ months = higher risk
+    }
+
+    // Very low deposits relative to any meaningful funding
+    if (totalDeposits < 100 && localDeal.amountRequested > 1000) score += 4
+
+    if (score >= 6) return { level: 'Severe Risk', class: 'risk-severe' }
+    if (score >= 4) return { level: 'High Risk', class: 'risk-high' }
     if (score >= 2) return { level: 'Moderate Risk', class: 'risk-moderate' }
     return { level: 'Low Risk', class: 'risk-low' }
   }
