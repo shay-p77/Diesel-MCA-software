@@ -1,30 +1,12 @@
-import nodemailer from 'nodemailer'
+import { Resend } from 'resend'
 
 // Email configuration from environment variables
-const EMAIL_HOST = process.env.EMAIL_HOST || 'smtp.gmail.com'
-const EMAIL_PORT = parseInt(process.env.EMAIL_PORT || '587')
-const EMAIL_USER = process.env.EMAIL_USER
-const EMAIL_PASSWORD = process.env.EMAIL_PASSWORD
-const EMAIL_FROM = process.env.EMAIL_FROM || EMAIL_USER
+const RESEND_API_KEY = process.env.RESEND_API_KEY
+const EMAIL_FROM = process.env.EMAIL_FROM || 'Diesel MCA <onboarding@resend.dev>'
 const APP_URL = process.env.APP_URL || 'http://localhost:3000'
 
-// Create reusable transporter
-const createTransporter = () => {
-  if (!EMAIL_USER || !EMAIL_PASSWORD) {
-    console.warn('⚠️  Email service not configured. Set EMAIL_USER and EMAIL_PASSWORD in .env')
-    return null
-  }
-
-  return nodemailer.createTransport({
-    host: EMAIL_HOST,
-    port: EMAIL_PORT,
-    secure: EMAIL_PORT === 465, // true for 465, false for other ports
-    auth: {
-      user: EMAIL_USER,
-      pass: EMAIL_PASSWORD,
-    },
-  })
-}
+// Initialize Resend client
+const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null
 
 interface SendEmailOptions {
   to: string
@@ -34,25 +16,27 @@ interface SendEmailOptions {
 }
 
 /**
- * Send an email
+ * Send an email using Resend
  */
 export async function sendEmail(options: SendEmailOptions): Promise<void> {
-  const transporter = createTransporter()
-
-  if (!transporter) {
-    throw new Error('Email service not configured')
+  if (!resend) {
+    throw new Error('Email service not configured. Set RESEND_API_KEY in .env')
   }
 
   try {
-    await transporter.sendMail({
-      from: `"Diesel MCA" <${EMAIL_FROM}>`,
-      to: options.to,
+    const { data, error } = await resend.emails.send({
+      from: EMAIL_FROM,
+      to: [options.to],
       subject: options.subject,
-      text: options.text,
       html: options.html,
     })
 
-    console.log(`✓ Email sent to ${options.to}`)
+    if (error) {
+      console.error('Failed to send email:', error)
+      throw new Error('Failed to send email')
+    }
+
+    console.log(`✓ Email sent to ${options.to} (ID: ${data?.id})`)
   } catch (error) {
     console.error('Failed to send email:', error)
     throw new Error('Failed to send email')
@@ -176,5 +160,5 @@ Diesel MCA Team
  * Check if email service is configured
  */
 export function isEmailConfigured(): boolean {
-  return !!(EMAIL_USER && EMAIL_PASSWORD)
+  return !!RESEND_API_KEY
 }
