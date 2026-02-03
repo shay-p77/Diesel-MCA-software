@@ -52,6 +52,7 @@ export function encrypt(text: string): string {
 /**
  * Decrypt data encrypted with AES-256-GCM
  * Expects: encrypted:iv:authTag format
+ * Returns original data if it doesn't appear to be encrypted
  */
 export function decrypt(encryptedData: string): string {
   try {
@@ -59,11 +60,18 @@ export function decrypt(encryptedData: string): string {
 
     // Split the encrypted data into components
     const parts = encryptedData.split(':')
+
+    // If data doesn't have 3 parts, it's probably not encrypted - return as-is
     if (parts.length !== 3) {
-      throw new Error('Invalid encrypted data format')
+      return encryptedData
     }
 
     const [encrypted, ivHex, authTagHex] = parts
+
+    // Validate that parts look like hex strings
+    if (!/^[0-9a-f]+$/i.test(ivHex) || !/^[0-9a-f]+$/i.test(authTagHex)) {
+      return encryptedData // Not encrypted, return as-is
+    }
 
     // Convert hex strings back to buffers
     const iv = Buffer.from(ivHex, 'hex')
@@ -85,8 +93,9 @@ export function decrypt(encryptedData: string): string {
 
     return decrypted
   } catch (error) {
-    console.error('Decryption error:', error)
-    throw new Error('Failed to decrypt data')
+    // If decryption fails, return original data (might be plain text or encrypted with different key)
+    console.warn('Could not decrypt data, returning as-is')
+    return encryptedData
   }
 }
 
