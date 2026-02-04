@@ -1,12 +1,13 @@
-import { createRequire } from 'module'
-const require = createRequire(import.meta.url)
-const pdfParse = require('pdf-parse')
-
 /**
  * Extract text content from a PDF buffer
+ * Uses dynamic import to avoid crash on module load
  */
 export async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
   try {
+    // Dynamic import to avoid crash at module load time
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const pdfParseModule: any = await import('pdf-parse')
+    const pdfParse = pdfParseModule.default || pdfParseModule
     const data = await pdfParse(pdfBuffer)
     return data.text
   } catch (error) {
