@@ -21,16 +21,28 @@ export interface Deal {
   updatedAt: string
 }
 
-export interface BankAccount {
-  id: string // Unique identifier for this account
-  accountNumber: string // Last 4 digits or account identifier
-  accountName: string // E.g., "Checking Account", "Savings Account"
-  bankName: string | null // E.g., "Chase", "Bank of America"
+export interface Statement {
+  id: string // Unique identifier for this statement
   pdfFileName: string
   pdfData?: string | null // Base64 encoded PDF stored in MongoDB
   koncileTaskId: string | null
   koncileDocumentId: number | null
   extractionStatus: 'pending' | 'processing' | 'done' | 'failed'
+}
+
+export interface BankAccount {
+  id: string // Unique identifier for this account
+  accountNumber: string // Last 4 digits or account identifier
+  accountName: string // E.g., "Checking Account", "Savings Account"
+  bankName: string | null // E.g., "Chase", "Bank of America"
+  // Legacy single PDF fields (for backward compatibility)
+  pdfFileName?: string | null
+  pdfData?: string | null // Base64 encoded PDF stored in MongoDB
+  koncileTaskId?: string | null
+  koncileDocumentId?: number | null
+  extractionStatus: 'pending' | 'processing' | 'done' | 'failed'
+  // Multiple statements per account (merged from same account number)
+  statements?: Statement[]
   bankData: BankData
   internalTransfers: InternalTransfer[] // Detected transfers between accounts
 }

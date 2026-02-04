@@ -45,11 +45,8 @@ const InternalTransferSchema = new Schema({
   description: String, // Will be encrypted
 }, { _id: false })
 
-const BankAccountSchema = new Schema({
+const StatementSchema = new Schema({
   id: { type: String, required: true },
-  accountNumber: { type: String, default: '' }, // Will be encrypted
-  accountName: { type: String, default: '' }, // Will be encrypted
-  bankName: { type: String, default: null }, // Will be encrypted
   pdfFileName: { type: String, required: true },
   pdfData: { type: String, default: null }, // Base64 encoded PDF stored in MongoDB
   koncileTaskId: { type: String, default: null },
@@ -59,6 +56,25 @@ const BankAccountSchema = new Schema({
     enum: ['pending', 'processing', 'done', 'failed'],
     default: 'pending',
   },
+}, { _id: false })
+
+const BankAccountSchema = new Schema({
+  id: { type: String, required: true },
+  accountNumber: { type: String, default: '' }, // Will be encrypted
+  accountName: { type: String, default: '' }, // Will be encrypted
+  bankName: { type: String, default: null }, // Will be encrypted
+  // Legacy single PDF fields (for backward compatibility)
+  pdfFileName: { type: String, default: null },
+  pdfData: { type: String, default: null }, // Base64 encoded PDF stored in MongoDB
+  koncileTaskId: { type: String, default: null },
+  koncileDocumentId: { type: Number, default: null },
+  extractionStatus: {
+    type: String,
+    enum: ['pending', 'processing', 'done', 'failed'],
+    default: 'pending',
+  },
+  // New: Multiple statements per account
+  statements: { type: [StatementSchema], default: [] },
   bankData: { type: BankDataSchema, required: true },
   internalTransfers: { type: [InternalTransferSchema], default: [] },
 }, { _id: false })

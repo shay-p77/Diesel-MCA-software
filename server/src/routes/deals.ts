@@ -4,9 +4,23 @@ import { v4 as uuidv4 } from 'uuid'
 import { createDeal, getDeal, getAllDeals, updateDeal, deleteDeal } from '../store/deals.js'
 import { getKoncileService } from '../services/koncile.js'
 import { getClaudeService } from '../services/claude.js'
+import { extractPdfTextFromBase64 } from '../services/pdfExtractor.js'
 import { CreateDealRequest, ChatRequest } from '../types/index.js'
 
 const router = Router()
+
+// Helper function to parse DD/MM/YYYY dates (Koncile format)
+function parseDateDDMMYYYY(dateStr: string): number {
+  if (!dateStr) return 0
+  // Try DD/MM/YYYY format first
+  const parts = dateStr.split('/')
+  if (parts.length === 3) {
+    const [day, month, year] = parts
+    return new Date(parseInt(year), parseInt(month) - 1, parseInt(day)).getTime()
+  }
+  // Fallback to standard parsing
+  return new Date(dateStr).getTime()
+}
 
 // Configure multer for file uploads
 const upload = multer({
@@ -194,6 +208,8 @@ router.post('/:id/upload', upload.array('files', 10), async (req: Request, res: 
     const updatedDeal = await updateDeal(deal.id, {
       bankAccounts: [...existingAccounts, ...newBankAccounts],
       extractionStatus: 'processing',
+      // Clear AI summary so it can be regenerated with new data
+      aiSummary: null,
       // Keep legacy fields for backward compatibility (use first account)
       ...(newBankAccounts.length > 0 && {
         koncileTaskId: newBankAccounts[0].koncileTaskId,
@@ -320,11 +336,18 @@ router.get('/:id/extraction', async (req: Request, res: Response) => {
         }
       }
 
-      // Detect internal transfers between accounts if all are done
+      // Merge accounts with same account number and detect internal transfers if all are done
       const allDone = updatedAccounts.every(acc => acc.extractionStatus === 'done')
       if (allDone && updatedAccounts.length > 1) {
-        console.log('[Internal Transfer Detection] All accounts processed, detecting internal transfers...')
-        updatedAccounts = detectInternalTransfers(updatedAccounts)
+        // First merge accounts that have the same account number (multiple statements)
+        console.log('[Account Merge] All accounts processed, checking for same-account statements to merge...')
+        updatedAccounts = mergeAccountsByNumber(updatedAccounts)
+
+        // Then detect internal transfers between different accounts
+        if (updatedAccounts.length > 1) {
+          console.log('[Internal Transfer Detection] Detecting internal transfers between accounts...')
+          updatedAccounts = detectInternalTransfers(updatedAccounts)
+        }
       }
 
       // Update deal with processed accounts
@@ -420,6 +443,151 @@ router.get('/:id/extraction', async (req: Request, res: Response) => {
   }
 })
 
+// Helper function to merge accounts with the same account number
+function mergeAccountsByNumber(accounts: any[]): any[] {
+  console.log(`[Account Merge] Starting merge check for ${accounts.length} accounts`)
+
+  // Group accounts by account number (skip empty account numbers)
+  const accountsByNumber: { [key: string]: any[] } = {}
+
+  for (const account of accounts) {
+    const accNum = account.accountNumber?.trim()
+    if (!accNum) {
+      // No account number - keep as separate account
+      if (!accountsByNumber['__no_account_number__']) {
+        accountsByNumber['__no_account_number__'] = []
+      }
+      accountsByNumber['__no_account_number__'].push(account)
+      continue
+    }
+
+    // Normalize account number (last 4 digits for matching)
+    const normalizedNum = accNum.slice(-4)
+    if (!accountsByNumber[normalizedNum]) {
+      accountsByNumber[normalizedNum] = []
+    }
+    accountsByNumber[normalizedNum].push(account)
+  }
+
+  const mergedAccounts: any[] = []
+
+  for (const [accNum, accs] of Object.entries(accountsByNumber)) {
+    if (accNum === '__no_account_number__' || accs.length === 1) {
+      // No merging needed - add accounts as-is
+      mergedAccounts.push(...accs)
+      continue
+    }
+
+    console.log(`[Account Merge] Merging ${accs.length} statements for account ending in ${accNum}`)
+
+    // Merge multiple accounts into one
+    const primaryAccount = accs[0]
+    const allTransactions: any[] = []
+
+    // Log transaction counts from each account being merged
+    for (const acc of accs) {
+      console.log(`[Account Merge]   - Account ${acc.id}: ${acc.bankData?.transactions?.length || 0} transactions`)
+    }
+    let totalDeposits = 0
+    let totalWithdrawals = 0
+    let minBeginningBalance = primaryAccount.bankData?.beginningBalance || 0
+    let maxEndingBalance = primaryAccount.bankData?.endingBalance || 0
+
+    // Collect statements from all accounts
+    const statements: any[] = []
+
+    for (const acc of accs) {
+      // Check if this account already has merged statements
+      if (acc.statements && acc.statements.length > 0) {
+        // Add existing statements from previously merged account
+        statements.push(...acc.statements)
+      } else {
+        // Add as a new statement
+        statements.push({
+          id: acc.id,
+          pdfFileName: acc.pdfFileName,
+          pdfData: acc.pdfData,
+          koncileTaskId: acc.koncileTaskId,
+          koncileDocumentId: acc.koncileDocumentId,
+          extractionStatus: acc.extractionStatus,
+        })
+      }
+
+      // Merge transactions
+      if (acc.bankData?.transactions) {
+        allTransactions.push(...acc.bankData.transactions)
+      }
+
+      // Aggregate totals
+      totalDeposits += acc.bankData?.totalDeposits || 0
+      totalWithdrawals += acc.bankData?.totalWithdrawals || 0
+
+      // Track balance range
+      if (acc.bankData?.beginningBalance < minBeginningBalance) {
+        minBeginningBalance = acc.bankData.beginningBalance
+      }
+      if (acc.bankData?.endingBalance > maxEndingBalance) {
+        maxEndingBalance = acc.bankData.endingBalance
+      }
+    }
+
+    // Sort transactions by date
+    allTransactions.sort((a, b) => parseDateDDMMYYYY(a.date) - parseDateDDMMYYYY(b.date))
+
+    // Remove duplicate transactions (same date, amount, and description)
+    const uniqueTransactions = allTransactions.filter((txn, index, self) =>
+      index === self.findIndex(t =>
+        t.date === txn.date &&
+        t.amount === txn.amount &&
+        t.description === txn.description
+      )
+    )
+
+    console.log(`[Account Merge] Combined ${allTransactions.length} transactions, ${allTransactions.length - uniqueTransactions.length} duplicates removed, ${uniqueTransactions.length} unique`)
+
+    // Calculate daily average deposit from unique transactions
+    const deposits = uniqueTransactions.filter((txn: any) => txn.amount > 0)
+    const dailyAvgDeposit = deposits.length > 0
+      ? deposits.reduce((sum: number, txn: any) => sum + txn.amount, 0) / deposits.length
+      : 0
+
+    // Create merged account
+    const mergedAccount = {
+      id: primaryAccount.id,
+      accountNumber: primaryAccount.accountNumber,
+      accountName: primaryAccount.accountName,
+      bankName: primaryAccount.bankName,
+      // Keep first PDF for backward compatibility
+      pdfFileName: primaryAccount.pdfFileName,
+      pdfData: primaryAccount.pdfData,
+      koncileTaskId: primaryAccount.koncileTaskId,
+      koncileDocumentId: primaryAccount.koncileDocumentId,
+      extractionStatus: 'done' as const,
+      // Store all statements
+      statements: statements,
+      bankData: {
+        totalDeposits,
+        totalWithdrawals,
+        endingBalance: maxEndingBalance,
+        beginningBalance: minBeginningBalance,
+        avgDailyBalance: 0,
+        dailyAvgDeposit,
+        nsfs: 0,
+        negativeDays: 0,
+        monthsOfStatements: statements.length,
+        transactions: uniqueTransactions,
+      },
+      internalTransfers: [],
+    }
+
+    console.log(`[Account Merge] Merged into single account with ${uniqueTransactions.length} unique transactions across ${statements.length} statements`)
+    mergedAccounts.push(mergedAccount)
+  }
+
+  console.log(`[Account Merge] Final account count: ${mergedAccounts.length} (was ${accounts.length})`)
+  return mergedAccounts
+}
+
 // Helper function to detect internal transfers between accounts
 function detectInternalTransfers(accounts: any[]) {
   console.log(`[Internal Transfer Detection] Analyzing ${accounts.length} accounts`)
@@ -500,18 +668,107 @@ router.post('/:id/chat', async (req: Request<{ id: string }, {}, ChatRequest>, r
 
     const claude = getClaudeService()
 
+    // Collect all transactions from all bank accounts
+    let allTransactions: any[] = []
+    let aggregatedBankData = {
+      totalDeposits: 0,
+      totalWithdrawals: 0,
+      endingBalance: 0,
+      avgDailyBalance: 0,
+      nsfs: 0,
+      negativeDays: 0,
+    }
+
+    console.log(`[Chat] Deal ${deal.id} has ${deal.bankAccounts?.length || 0} bank accounts`)
+
+    if (deal.bankAccounts && deal.bankAccounts.length > 0) {
+      for (const account of deal.bankAccounts) {
+        console.log(`[Chat] Account ${account.accountName}: ${account.bankData?.transactions?.length || 0} transactions, status: ${account.extractionStatus}`)
+        if (account.statements && account.statements.length > 0) {
+          console.log(`[Chat]   - Has ${account.statements.length} merged statements`)
+        }
+
+        if (account.bankData) {
+          // Aggregate bank data
+          aggregatedBankData.totalDeposits += account.bankData.totalDeposits || 0
+          aggregatedBankData.totalWithdrawals += account.bankData.totalWithdrawals || 0
+          aggregatedBankData.endingBalance += account.bankData.endingBalance || 0
+          aggregatedBankData.avgDailyBalance += account.bankData.avgDailyBalance || 0
+          aggregatedBankData.nsfs += account.bankData.nsfs || 0
+          aggregatedBankData.negativeDays += account.bankData.negativeDays || 0
+
+          // Collect transactions with account info
+          if (account.bankData.transactions && account.bankData.transactions.length > 0) {
+            const accountTransactions = account.bankData.transactions.map((txn: any) => ({
+              ...txn,
+              accountName: account.accountName || 'Unknown Account',
+            }))
+            allTransactions.push(...accountTransactions)
+          }
+        }
+      }
+
+      // Sort transactions by date (handle DD/MM/YYYY format from Koncile)
+      allTransactions.sort((a, b) => parseDateDDMMYYYY(a.date) - parseDateDDMMYYYY(b.date))
+    } else if (deal.bankData) {
+      // Legacy single account support
+      aggregatedBankData = {
+        totalDeposits: deal.bankData.totalDeposits || 0,
+        totalWithdrawals: deal.bankData.totalWithdrawals || 0,
+        endingBalance: deal.bankData.endingBalance || 0,
+        avgDailyBalance: deal.bankData.avgDailyBalance || 0,
+        nsfs: deal.bankData.nsfs || 0,
+        negativeDays: deal.bankData.negativeDays || 0,
+      }
+      if (deal.bankData.transactions) {
+        allTransactions = deal.bankData.transactions
+      }
+    }
+
+    // Log transaction summary
+    console.log(`[Chat] Total transactions collected: ${allTransactions.length}`)
+    if (allTransactions.length > 0) {
+      console.log(`[Chat] Date range: ${allTransactions[0]?.date} to ${allTransactions[allTransactions.length - 1]?.date}`)
+    }
+
+    // Extract raw PDF text from all statements for complete context
+    const rawPdfTexts: string[] = []
+    if (deal.bankAccounts && deal.bankAccounts.length > 0) {
+      for (const account of deal.bankAccounts) {
+        // Check if account has merged statements
+        if (account.statements && account.statements.length > 0) {
+          for (const stmt of account.statements) {
+            if (stmt.pdfData) {
+              console.log(`[Chat] Extracting text from statement: ${stmt.pdfFileName}`)
+              const text = await extractPdfTextFromBase64(stmt.pdfData)
+              if (text) {
+                rawPdfTexts.push(text)
+              }
+            }
+          }
+        } else if (account.pdfData) {
+          // Single PDF per account (not merged)
+          console.log(`[Chat] Extracting text from account PDF: ${account.pdfFileName}`)
+          const text = await extractPdfTextFromBase64(account.pdfData)
+          if (text) {
+            rawPdfTexts.push(text)
+          }
+        }
+      }
+    }
+    console.log(`[Chat] Extracted text from ${rawPdfTexts.length} PDFs`)
+
     const response = await claude.chat(
       {
         businessName: deal.businessName,
         ownerName: deal.ownerName,
         amountRequested: deal.amountRequested,
         industry: deal.industry,
-        bankData: deal.bankData || {
-          totalDeposits: 0,
-          totalWithdrawals: 0,
-          endingBalance: 0,
-        },
+        bankData: aggregatedBankData,
         existingPositions: deal.existingPositions,
+        transactions: allTransactions,
+        aiSummary: deal.aiSummary,
+        rawPdfText: rawPdfTexts,
       },
       message,
       history.map(m => ({ role: m.role, content: m.content }))
@@ -562,17 +819,59 @@ router.post('/:id/generate-summary', async (req: Request, res: Response) => {
 
     const claude = getClaudeService()
 
+    // Collect all transactions from all bank accounts (same logic as chat)
+    let allTransactions: any[] = []
+    let aggregatedBankData = {
+      totalDeposits: 0,
+      totalWithdrawals: 0,
+      endingBalance: 0,
+      avgDailyBalance: 0,
+      nsfs: 0,
+      negativeDays: 0,
+    }
+
+    if (deal.bankAccounts && deal.bankAccounts.length > 0) {
+      for (const account of deal.bankAccounts) {
+        if (account.bankData) {
+          aggregatedBankData.totalDeposits += account.bankData.totalDeposits || 0
+          aggregatedBankData.totalWithdrawals += account.bankData.totalWithdrawals || 0
+          aggregatedBankData.endingBalance += account.bankData.endingBalance || 0
+          aggregatedBankData.avgDailyBalance += account.bankData.avgDailyBalance || 0
+          aggregatedBankData.nsfs += account.bankData.nsfs || 0
+          aggregatedBankData.negativeDays += account.bankData.negativeDays || 0
+
+          if (account.bankData.transactions && account.bankData.transactions.length > 0) {
+            const accountTransactions = account.bankData.transactions.map((txn: any) => ({
+              ...txn,
+              accountName: account.accountName || 'Unknown Account',
+            }))
+            allTransactions.push(...accountTransactions)
+          }
+        }
+      }
+      allTransactions.sort((a, b) => parseDateDDMMYYYY(a.date) - parseDateDDMMYYYY(b.date))
+    } else if (deal.bankData) {
+      aggregatedBankData = {
+        totalDeposits: deal.bankData.totalDeposits || 0,
+        totalWithdrawals: deal.bankData.totalWithdrawals || 0,
+        endingBalance: deal.bankData.endingBalance || 0,
+        avgDailyBalance: deal.bankData.avgDailyBalance || 0,
+        nsfs: deal.bankData.nsfs || 0,
+        negativeDays: deal.bankData.negativeDays || 0,
+      }
+      if (deal.bankData.transactions) {
+        allTransactions = deal.bankData.transactions
+      }
+    }
+
     const summary = await claude.generateSummary({
       businessName: deal.businessName,
       ownerName: deal.ownerName,
       amountRequested: deal.amountRequested,
       industry: deal.industry,
-      bankData: deal.bankData || {
-        totalDeposits: 0,
-        totalWithdrawals: 0,
-        endingBalance: 0,
-      },
+      bankData: aggregatedBankData,
       existingPositions: deal.existingPositions,
+      transactions: allTransactions,
     })
 
     const updatedDeal = await updateDeal(deal.id, { aiSummary: summary })
@@ -650,7 +949,7 @@ router.get('/:id/pdf', async (req: Request, res: Response) => {
   }
 })
 
-// GET /api/deals/:id/pdf/:accountId - Serve specific account's PDF file
+// GET /api/deals/:id/pdf/:accountId - Serve specific account's or statement's PDF file
 router.get('/:id/pdf/:accountId', async (req: Request, res: Response) => {
   try {
     const deal = await getDeal(req.params.id)
@@ -665,24 +964,41 @@ router.get('/:id/pdf/:accountId', async (req: Request, res: Response) => {
       return
     }
 
-    const account = deal.bankAccounts.find(acc => acc.id === req.params.accountId)
+    const requestedId = req.params.accountId
+    let pdfData: string | null = null
+    let pdfFileName: string | null = null
 
-    if (!account) {
-      res.status(404).json({ error: 'Bank account not found' })
-      return
+    // First, try to find as account ID
+    const account = deal.bankAccounts.find(acc => acc.id === requestedId)
+
+    if (account && account.pdfData) {
+      pdfData = account.pdfData
+      pdfFileName = account.pdfFileName || 'statement.pdf'
+    } else {
+      // Not found as account, search within statements (for merged accounts)
+      for (const acc of deal.bankAccounts) {
+        if (acc.statements && acc.statements.length > 0) {
+          const statement = acc.statements.find((stmt: any) => stmt.id === requestedId)
+          if (statement && statement.pdfData) {
+            pdfData = statement.pdfData
+            pdfFileName = statement.pdfFileName || 'statement.pdf'
+            break
+          }
+        }
+      }
     }
 
-    if (!account.pdfData) {
-      res.status(404).json({ error: 'PDF file not found in database' })
+    if (!pdfData) {
+      res.status(404).json({ error: 'PDF file not found' })
       return
     }
 
     // Convert base64 back to buffer
-    const pdfBuffer = Buffer.from(account.pdfData, 'base64')
+    const pdfBuffer = Buffer.from(pdfData, 'base64')
 
     // Set headers for PDF
     res.setHeader('Content-Type', 'application/pdf')
-    res.setHeader('Content-Disposition', `inline; filename="${account.pdfFileName}"`)
+    res.setHeader('Content-Disposition', `inline; filename="${pdfFileName}"`)
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Methods', 'GET')
     res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin')

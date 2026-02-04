@@ -288,3 +288,50 @@ mark.search-highlight {
   padding: 0;
   font-weight: 500;
 }
+
+/* Continuous scroll mode */
+.pdf-document.continuous-scroll {
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+}
+
+.pdf-section {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.pdf-section-header {
+  background: #3d4043;
+  padding: 0.5rem 1rem;
+  border-radius: 4px 4px 0 0;
+  width: fit-content;
+  margin-bottom: 0;
+}
+
+.pdf-section-header .pdf-label {
+  color: #ccc;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.pdf-page-continuous {
+  margin-bottom: 0.5rem;
+}
+
+.page-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: #525659;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+}
+
+.page-info span {
+  color: #ccc;
+  font-size: 0.875rem;
+}

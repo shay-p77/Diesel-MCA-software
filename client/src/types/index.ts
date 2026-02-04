@@ -21,15 +21,27 @@ export interface Deal {
   updatedAt: string
 }
 
+export interface Statement {
+  id: string
+  pdfFileName: string
+  pdfData?: string | null
+  koncileTaskId: string | null
+  koncileDocumentId: number | null
+  extractionStatus: 'pending' | 'processing' | 'done' | 'failed'
+}
+
 export interface BankAccount {
   id: string
   accountNumber: string
   accountName: string
   bankName: string | null
-  pdfFileName: string
-  koncileTaskId: string | null
-  koncileDocumentId: number | null
+  // Legacy single PDF fields (for backward compatibility)
+  pdfFileName?: string | null
+  koncileTaskId?: string | null
+  koncileDocumentId?: number | null
   extractionStatus: 'pending' | 'processing' | 'done' | 'failed'
+  // Multiple statements per account (merged from same account number)
+  statements?: Statement[]
   bankData: BankData
   internalTransfers: InternalTransfer[]
 }

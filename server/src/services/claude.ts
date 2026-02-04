@@ -25,6 +25,8 @@ interface DealContext {
     amount: number
     description?: string
   }>
+  aiSummary?: string | null
+  rawPdfText?: string[]
 }
 
 interface ChatMessage {
@@ -69,6 +71,15 @@ ${deal.existingPositions.length > 0
   : '- No existing positions detected'}
 ${dailyObligation > 0 ? `\nTotal Daily Obligation: $${dailyObligation}/day` : ''}
 
+TRANSACTION DATA (Koncile extracted):
+${this.formatTransactions(deal.transactions)}
+${deal.aiSummary ? `
+PREVIOUS AI ANALYSIS:
+${deal.aiSummary}
+` : ''}
+RAW BANK STATEMENT TEXT:
+${this.formatRawPdfText(deal.rawPdfText)}
+
 YOUR ROLE:
 - Answer questions about this specific deal
 - Provide risk analysis based on the extracted data
@@ -76,8 +87,63 @@ YOUR ROLE:
 - Be concise and specific - reference actual numbers from the data
 - Flag any concerns or red flags you notice
 - When asked for recommendations, be direct
+- You have access to detailed transaction-level data - use it to answer specific questions about deposits, withdrawals, patterns, and individual transactions
 
 Remember: The underwriter can see the same extracted data, so your analysis should focus on insights and interpretation, not just repeating numbers.`
+  }
+
+  /**
+   * Format raw PDF text for the prompt
+   */
+  private formatRawPdfText(pdfTexts?: string[]): string {
+    if (!pdfTexts || pdfTexts.length === 0) {
+      return 'No raw PDF text available'
+    }
+
+    let output = ''
+    for (let i = 0; i < pdfTexts.length; i++) {
+      const text = pdfTexts[i]
+      // Truncate each PDF text to avoid token limits (keep first 8000 chars per statement)
+      const truncatedText = text.length > 8000 ? text.substring(0, 8000) + '\n... [truncated]' : text
+      output += `\n--- Statement ${i + 1} ---\n${truncatedText}\n`
+    }
+
+    return output
+  }
+
+  /**
+   * Format transactions for the prompt
+   */
+  private formatTransactions(transactions?: DealContext['transactions']): string {
+    if (!transactions || transactions.length === 0) {
+      return 'No transaction data available'
+    }
+
+    // Limit to most recent 100 transactions to avoid token limits
+    const recentTransactions = transactions.slice(-100)
+    const hasMoreTransactions = transactions.length > 100
+
+    let output = `Total transactions: ${transactions.length}${hasMoreTransactions ? ' (showing most recent 100)' : ''}\n\n`
+
+    // Group transactions by type for summary
+    const deposits = transactions.filter(t => t.amount > 0)
+    const withdrawals = transactions.filter(t => t.amount < 0)
+
+    output += `Summary:\n`
+    output += `- Total deposits: ${deposits.length} transactions totaling $${deposits.reduce((sum, t) => sum + t.amount, 0).toLocaleString()}\n`
+    output += `- Total withdrawals: ${withdrawals.length} transactions totaling $${Math.abs(withdrawals.reduce((sum, t) => sum + t.amount, 0)).toLocaleString()}\n\n`
+
+    output += `Recent Transactions:\n`
+    output += `Date | Type | Amount | Description\n`
+    output += `-----|------|--------|------------\n`
+
+    for (const txn of recentTransactions) {
+      const amount = txn.amount >= 0 ? `+$${txn.amount.toLocaleString()}` : `-$${Math.abs(txn.amount).toLocaleString()}`
+      const desc = txn.description ? txn.description.substring(0, 50) : 'N/A'
+      output += `${txn.date} | ${txn.type} | ${amount} | ${desc}\n`
+    }
+
+    return output
   }
 
   /**

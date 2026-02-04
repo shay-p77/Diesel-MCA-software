@@ -17,7 +17,6 @@ interface PDFViewerProps {
 
 export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
   const [numPages, setNumPages] = useState<number | null>(null)
-  const [pageNumber, setPageNumber] = useState(1)
   const [searchText, setSearchText] = useState('')
   const [searchResults, setSearchResults] = useState<number[]>([])
   const [currentSearchIndex, setCurrentSearchIndex] = useState(0)
@@ -62,10 +61,6 @@ export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
 
       setSearchResults(results)
       setCurrentSearchIndex(0)
-
-      if (results.length > 0) {
-        setPageNumber(results[0])
-      }
     } catch (error) {
       console.error('Search error:', error)
     } finally {
@@ -77,21 +72,12 @@ export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
     if (searchResults.length === 0) return
     const nextIndex = (currentSearchIndex + 1) % searchResults.length
     setCurrentSearchIndex(nextIndex)
-    setPageNumber(searchResults[nextIndex])
   }
 
   const prevSearchResult = () => {
     if (searchResults.length === 0) return
     const prevIndex = currentSearchIndex === 0 ? searchResults.length - 1 : currentSearchIndex - 1
     setCurrentSearchIndex(prevIndex)
-    setPageNumber(searchResults[prevIndex])
-  }
-
-  const changePage = (offset: number) => {
-    setPageNumber((prevPageNumber) => {
-      const newPage = prevPageNumber + offset
-      return Math.min(Math.max(1, newPage), numPages || 1)
-    })
   }
 
   const zoomIn = () => setScale(s => Math.min(s + 0.1, 2.0))
@@ -106,7 +92,7 @@ export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
     }
   }
 
-  // Highlight search results when page or search text changes
+  // Highlight search results when search text changes
   useEffect(() => {
     if (!searchText.trim() || searchResults.length === 0) {
       // Clear any existing highlights
@@ -116,18 +102,15 @@ export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
       return
     }
 
-    // Wait for the page text layer to fully render, then highlight
+    // Wait for the text layers to fully render, then highlight across all pages
     const timer = setTimeout(() => {
       if (pdfDocumentRef.current) {
-        // Find the text layer element
-        const textLayer = pdfDocumentRef.current.querySelector('.react-pdf__Page__textContent')
+        // Find all text layer elements (for continuous scroll, there are multiple)
+        const textLayers = pdfDocumentRef.current.querySelectorAll('.react-pdf__Page__textContent')
 
-        if (textLayer) {
+        textLayers.forEach(textLayer => {
           // Create mark instance on the text layer
           const markInstance = new Mark(textLayer)
-
-          // Clear previous highlights
-          markInstance.unmark()
 
           // Highlight the search term
           markInstance.mark(searchText, {
@@ -136,22 +119,38 @@ export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
             separateWordSearch: false,
             caseSensitive: false,
           })
-
-          markInstanceRef.current = markInstance
-        }
+        })
       }
-    }, 300) // Increased timeout to ensure text layer is rendered
+    }, 500)
 
     return () => clearTimeout(timer)
-  }, [pageNumber, searchText, searchResults])
+  }, [searchText, searchResults, numPages])
 
-  // Memoize file and options to avoid unnecessary reloads
+  // Memoize file config to avoid unnecessary reloads
   const fileConfig = useMemo(() => ({
     url: pdfUrl,
-    withCredentials: false,
   }), [pdfUrl])
 
   const pdfOptions = useMemo(() => ({}), [])
+
+  // Render all pages for continuous scroll
+  const renderAllPages = () => {
+    if (!numPages) return null
+    const pages = []
+    for (let i = 1; i <= numPages; i++) {
+      pages.push(
+        <Page
+          key={`page-${i}`}
+          pageNumber={i}
+          scale={scale}
+          renderTextLayer={true}
+          renderAnnotationLayer={true}
+          className="pdf-page-continuous"
+        />
+      )
+    }
+    return pages
+  }
 
   return (
     <div className="pdf-viewer-container">
@@ -189,28 +188,23 @@ export default function PDFViewer({ pdfUrl }: PDFViewerProps) {
           <span>{Math.round(scale * 100)}%</span>
           <button onClick={zoomIn} title="Zoom In">+</button>
 
-          <div className="page-controls">
-            <button onClick={() => changePage(-1)} disabled={pageNumber <= 1}>←</button>
-            <span>Page {pageNumber} of {numPages}</span>
-            <button onClick={() => changePage(1)} disabled={pageNumber >= (numPages || 1)}>→</button>
-          </div>
+          {numPages && numPages > 0 && (
+            <div className="page-info">
+              <span>{numPages} pages</span>
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="pdf-document" ref={pdfDocumentRef}>
+      <div className="pdf-document continuous-scroll" ref={pdfDocumentRef}>
         <Document
           file={fileConfig}
           onLoadSuccess={onDocumentLoadSuccess}
           loading={<div className="pdf-loading">Loading PDF...</div>}
-          error={<div className="pdf-error">Failed to load PDF. Check console for details.</div>}
+          error={<div className="pdf-error">Failed to load PDF.</div>}
           options={pdfOptions}
         >
-          <Page
-            pageNumber={pageNumber}
-            scale={scale}
-            renderTextLayer={true}
-            renderAnnotationLayer={true}
-          />
+          {renderAllPages()}
         </Document>
       </div>
     </div>

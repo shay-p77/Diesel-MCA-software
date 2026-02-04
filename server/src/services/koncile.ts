@@ -175,6 +175,17 @@ export class KoncileService {
     const generalFields = result.General_fields || {}
     const lineFields = result.Line_fields || {}
 
+    // Log all available fields from Koncile for debugging
+    console.log('[Koncile Parse] General fields available:', Object.keys(generalFields))
+    console.log('[Koncile Parse] Line fields available:', Object.keys(lineFields))
+
+    // Log the full line fields structure to understand what Koncile is returning
+    for (const [fieldName, fieldData] of Object.entries(lineFields)) {
+      const data = fieldData as any
+      const count = Array.isArray(data) ? data.length : (data?.values?.length || 0)
+      console.log(`[Koncile Parse]   - ${fieldName}: ${count} items`)
+    }
+
     // Extract bank data from general fields
     const bankData = {
       beginningBalance: this.parseNumber(generalFields['Beginning Balance']?.value),
@@ -244,6 +255,8 @@ export class KoncileService {
 
     const count = Math.max(dates.length, types.length, amounts.length)
 
+    console.log(`[Koncile Parse] Found ${count} transactions (dates: ${dates.length}, types: ${types.length}, amounts: ${amounts.length}, descriptions: ${descriptions.length})`)
+
     for (let i = 0; i < count; i++) {
       transactions.push({
         date: dates[i]?.value || '',
@@ -252,6 +265,12 @@ export class KoncileService {
         checkNumber: checkNumbers[i]?.value || undefined,
         description: descriptions[i]?.value || '',
       })
+    }
+
+    // Log date range of extracted transactions
+    if (transactions.length > 0) {
+      const sortedByDate = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+      console.log(`[Koncile Parse] Transaction date range: ${sortedByDate[0]?.date} to ${sortedByDate[sortedByDate.length - 1]?.date}`)
     }
 
     return transactions

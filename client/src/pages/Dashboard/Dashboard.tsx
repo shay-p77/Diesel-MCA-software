@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import Header from '../../components/Header'
-import FilterBar, { SortOption } from '../../components/FilterBar'
+import FilterBar, { SortOption, StatusFilter, NSFFilter, PositionFilter, AmountRange } from '../../components/FilterBar'
 import StatsRow from '../../components/StatsRow'
 import DealCard from '../../components/DealCard'
 import DealModal from '../../components/DealModal'
@@ -17,6 +17,10 @@ export default function Dashboard() {
   const [searchQuery, setSearchQuery] = useState('')
   const [industryFilter, setIndustryFilter] = useState<string>('all')
   const [sortBy, setSortBy] = useState<SortOption>('date_desc')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
+  const [nsfFilter, setNSFFilter] = useState<NSFFilter>('all')
+  const [positionFilter, setPositionFilter] = useState<PositionFilter>('all')
+  const [amountRange, setAmountRange] = useState<AmountRange>('all')
 
   // Fetch deals from API
   useEffect(() => {
@@ -42,9 +46,18 @@ export default function Dashboard() {
     return ['all', ...Array.from(set)]
   }, [deals])
 
+  // Helper to get NSF count from deal
+  const getNSFCount = (deal: Deal): number => {
+    if (deal.bankAccounts && deal.bankAccounts.length > 0) {
+      return deal.bankAccounts.reduce((sum, acc) => sum + (acc.bankData?.nsfs || 0), 0)
+    }
+    return deal.bankData?.nsfs || 0
+  }
+
   const filteredDeals = useMemo(() => {
     let filtered = [...deals]
 
+    // Search filter
     if (searchQuery) {
       const query = searchQuery.toLowerCase()
       filtered = filtered.filter(d =>
@@ -53,10 +66,70 @@ export default function Dashboard() {
       )
     }
 
+    // Industry filter
     if (industryFilter !== 'all') {
       filtered = filtered.filter(d => d.industry === industryFilter)
     }
 
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(d => d.status === statusFilter)
+    }
+
+    // Amount range filter
+    if (amountRange !== 'all') {
+      filtered = filtered.filter(d => {
+        const amount = d.amountRequested
+        switch (amountRange) {
+          case '0-25k':
+            return amount >= 0 && amount < 25000
+          case '25k-50k':
+            return amount >= 25000 && amount < 50000
+          case '50k-100k':
+            return amount >= 50000 && amount < 100000
+          case '100k+':
+            return amount >= 100000
+          default:
+            return true
+        }
+      })
+    }
+
+    // NSF filter
+    if (nsfFilter !== 'all') {
+      filtered = filtered.filter(d => {
+        const nsfs = getNSFCount(d)
+        switch (nsfFilter) {
+          case '0':
+            return nsfs === 0
+          case '1-2':
+            return nsfs >= 1 && nsfs <= 2
+          case '3+':
+            return nsfs >= 3
+          default:
+            return true
+        }
+      })
+    }
+
+    // Position filter
+    if (positionFilter !== 'all') {
+      filtered = filtered.filter(d => {
+        const positions = d.existingPositions?.length || 0
+        switch (positionFilter) {
+          case '0':
+            return positions === 0
+          case '1-2':
+            return positions >= 1 && positions <= 2
+          case '3+':
+            return positions >= 3
+          default:
+            return true
+        }
+      })
+    }
+
+    // Sort
     filtered.sort((a, b) => {
       switch (sortBy) {
         case 'date_desc':
@@ -75,7 +148,7 @@ export default function Dashboard() {
     })
 
     return filtered
-  }, [deals, searchQuery, industryFilter, sortBy])
+  }, [deals, searchQuery, industryFilter, sortBy, statusFilter, nsfFilter, positionFilter, amountRange])
 
   const handleNewDeal = () => {
     setIsModalOpen(true)
@@ -124,6 +197,14 @@ export default function Dashboard() {
         industries={industries}
         sortBy={sortBy}
         onSortChange={setSortBy}
+        statusFilter={statusFilter}
+        onStatusChange={setStatusFilter}
+        nsfFilter={nsfFilter}
+        onNSFChange={setNSFFilter}
+        positionFilter={positionFilter}
+        onPositionChange={setPositionFilter}
+        amountRange={amountRange}
+        onAmountRangeChange={setAmountRange}
       />
 
       <StatsRow deals={deals} />

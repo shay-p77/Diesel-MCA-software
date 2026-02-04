@@ -130,8 +130,31 @@ export default function DealDetail() {
   // Determine if using multi-account structure or legacy
   const hasMultipleAccounts = deal.bankAccounts && deal.bankAccounts.length > 0
   const hasPdf = hasMultipleAccounts
-    ? deal.bankAccounts.some(acc => acc.pdfFileName)
+    ? deal.bankAccounts.some(acc => acc.pdfFileName || (acc.statements && acc.statements.length > 0))
     : deal.pdfFileName
+
+  // Build flat list of all PDF sources (handles both direct accounts and merged statements)
+  const allPdfSources = hasMultipleAccounts
+    ? deal.bankAccounts.flatMap((account, accountIndex) => {
+        // If account has statements (merged), include each statement
+        if (account.statements && account.statements.length > 0) {
+          return account.statements.map((stmt, stmtIndex) => ({
+            id: stmt.id,
+            label: `${account.accountName || `Account ${accountIndex + 1}`} - Statement ${stmtIndex + 1}`,
+            fileName: stmt.pdfFileName || 'statement.pdf'
+          }))
+        }
+        // Otherwise include the account's PDF directly
+        return [{
+          id: account.id,
+          label: account.accountName || `Account ${accountIndex + 1}`,
+          fileName: account.pdfFileName || 'statement.pdf'
+        }]
+      })
+    : []
+
+  // Get the currently selected PDF
+  const selectedPdf = allPdfSources[selectedAccountIndex] || allPdfSources[0]
 
   return (
     <div className="deal-detail">
@@ -187,27 +210,31 @@ export default function DealDetail() {
         <div className="pdf-viewer">
           {hasPdf ? (
             <>
-              {/* Account Selector for Multiple Accounts */}
-              {hasMultipleAccounts && deal.bankAccounts.length > 1 && (
+              {/* Statement Selector and Add Button */}
+              {hasMultipleAccounts && (
                 <div className="account-selector">
-                  <label htmlFor="account-select">View Account:</label>
-                  <select
-                    id="account-select"
-                    value={selectedAccountIndex}
-                    onChange={(e) => setSelectedAccountIndex(Number(e.target.value))}
-                  >
-                    {deal.bankAccounts.map((account, index) => (
-                      <option key={account.id} value={index}>
-                        {account.accountName || `Account ${index + 1}`}
-                        {account.accountNumber && ` (****${account.accountNumber.slice(-4)})`}
-                      </option>
-                    ))}
-                  </select>
+                  {allPdfSources.length > 1 && (
+                    <>
+                      <label htmlFor="account-select">View Statement:</label>
+                      <select
+                        id="account-select"
+                        value={selectedAccountIndex}
+                        onChange={(e) => setSelectedAccountIndex(Number(e.target.value))}
+                      >
+                        {allPdfSources.map((pdf, index) => (
+                          <option key={pdf.id} value={index}>
+                            {pdf.label}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  )}
                   <button
                     className="btn-add-account"
                     onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
                   >
-                    + Add Account
+                    {uploading ? 'Uploading...' : '+ Add Statements'}
                   </button>
                   <input
                     type="file"
@@ -220,10 +247,10 @@ export default function DealDetail() {
                 </div>
               )}
 
-              {hasMultipleAccounts ? (
+              {hasMultipleAccounts && selectedPdf ? (
                 <PDFViewer
-                  pdfUrl={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/deals/${deal.id}/pdf/${deal.bankAccounts[selectedAccountIndex].id}`}
-                  fileName={deal.bankAccounts[selectedAccountIndex].pdfFileName}
+                  pdfUrl={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/deals/${deal.id}/pdf/${selectedPdf.id}`}
+                  fileName={selectedPdf.fileName}
                 />
               ) : (
                 <PDFViewer
