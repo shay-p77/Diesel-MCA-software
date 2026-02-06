@@ -9,6 +9,7 @@ export interface Deal {
   broker: string | null
   notes: string | null
   aiSummary: string | null
+  aiAnalysis: any | null
   chatHistory: ChatMessage[]
   bankData: BankData | null // Legacy - for backward compatibility
   bankAccounts: BankAccount[] // New multi-account support

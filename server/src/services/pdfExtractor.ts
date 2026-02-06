@@ -1,15 +1,16 @@
+import { PDFParse } from 'pdf-parse'
+
 /**
  * Extract text content from a PDF buffer
- * Uses dynamic import to avoid crash on module load
  */
 export async function extractPdfText(pdfBuffer: Buffer): Promise<string> {
   try {
-    // Dynamic import to avoid crash at module load time
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const pdfParseModule: any = await import('pdf-parse')
-    const pdfParse = pdfParseModule.default || pdfParseModule
-    const data = await pdfParse(pdfBuffer)
-    return data.text
+    console.log('[PDF Extract] Parsing buffer of size:', pdfBuffer.length)
+    const parser = new PDFParse({ data: new Uint8Array(pdfBuffer) })
+    const result = await parser.getText()
+    await parser.destroy()
+    console.log('[PDF Extract] Extracted text length:', result.text?.length || 0)
+    return result.text || ''
   } catch (error) {
     console.error('[PDF Extract] Failed to extract text:', error)
     return ''

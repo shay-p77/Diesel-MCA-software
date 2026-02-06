@@ -94,6 +94,7 @@ const DealSchema = new Schema({
   broker: { type: String, default: null }, // Will be encrypted
   notes: { type: String, default: null }, // Will be encrypted
   aiSummary: { type: String, default: null },
+  aiAnalysis: { type: Schema.Types.Mixed, default: null },
   chatHistory: { type: [ChatMessageSchema], default: [] },
   bankData: { type: BankDataSchema, default: null },
   bankAccounts: { type: [BankAccountSchema], default: [] },
@@ -256,6 +257,7 @@ export function docToDeal(doc: any): Deal {
     broker: decrypted.broker,
     notes: decrypted.notes,
     aiSummary: decrypted.aiSummary,
+    aiAnalysis: decrypted.aiAnalysis || null,
     chatHistory: decrypted.chatHistory || [],
     bankData: decrypted.bankData,
     bankAccounts: decrypted.bankAccounts || [],

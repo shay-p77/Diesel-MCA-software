@@ -192,20 +192,23 @@ export class KoncileService {
       depositsAndAdditions: this.parseNumber(generalFields['Deposits and Additions']?.value),
       checksPaid: this.parseNumber(generalFields['Checks Paid']?.value),
       endingBalance: this.parseNumber(generalFields['Ending Balance']?.value),
-      // Add more fields as needed based on what Koncile extracts
     }
 
-    // Extract transactions from line fields
+    // Extract statement period (e.g. "01/04/2025 through 30/04/2025")
+    const statementPeriod = generalFields['Statement period']?.value ||
+                            generalFields['Statement Period']?.value || ''
+
+    // Extract transactions from line fields (amounts negated for withdrawals, dates in ISO)
     const transactions = this.parseLineFields(lineFields)
 
-    // Calculate derived metrics
+    // Calculate derived metrics (deposits are positive, withdrawals are negative)
     const totalDeposits = transactions
-      .filter(t => t.type === 'Deposit')
+      .filter(t => t.amount > 0)
       .reduce((sum, t) => sum + t.amount, 0)
 
     const totalWithdrawals = transactions
-      .filter(t => t.type !== 'Deposit')
-      .reduce((sum, t) => sum + t.amount, 0)
+      .filter(t => t.amount < 0)
+      .reduce((sum, t) => sum + Math.abs(t.amount), 0)
 
     return {
       raw: {
@@ -218,6 +221,7 @@ export class KoncileService {
         totalWithdrawals,
         transactionCount: transactions.length,
       },
+      statementPeriod,
       transactions,
     }
   }
@@ -258,10 +262,21 @@ export class KoncileService {
     console.log(`[Koncile Parse] Found ${count} transactions (dates: ${dates.length}, types: ${types.length}, amounts: ${amounts.length}, descriptions: ${descriptions.length})`)
 
     for (let i = 0; i < count; i++) {
+      const rawDate = dates[i]?.value || ''
+      const type = types[i]?.value || 'Other'
+      const rawAmount = this.parseNumber(amounts[i]?.value)
+
+      // Convert DD/MM/YYYY dates to ISO (YYYY-MM-DD) for proper JS Date handling
+      const date = this.convertDateToISO(rawDate)
+
+      // Koncile returns ALL amounts as positive - negate withdrawals
+      const isDeposit = type === 'Deposit'
+      const amount = isDeposit ? rawAmount : -rawAmount
+
       transactions.push({
-        date: dates[i]?.value || '',
-        type: types[i]?.value || 'Other',
-        amount: this.parseNumber(amounts[i]?.value),
+        date,
+        type,
+        amount,
         checkNumber: checkNumbers[i]?.value || undefined,
         description: descriptions[i]?.value || '',
       })
@@ -274,6 +289,19 @@ export class KoncileService {
     }
 
     return transactions
+  }
+
+  /**
+   * Convert DD/MM/YYYY date string to ISO YYYY-MM-DD format
+   */
+  private convertDateToISO(dateStr: string): string {
+    if (!dateStr) return ''
+    const parts = dateStr.split('/')
+    if (parts.length === 3) {
+      const [day, month, year] = parts
+      return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`
+    }
+    return dateStr
   }
 }
 

@@ -13,6 +13,7 @@ export interface Deal {
   bankData: BankData | null // Legacy - for backward compatibility
   bankAccounts: BankAccount[] // New multi-account support
   existingPositions: Position[]
+  aiAnalysis: AIAnalysis | null
   koncileTaskId: string | null
   koncileDocumentId: number | null
   extractionStatus: 'pending' | 'processing' | 'done' | 'failed' | null
@@ -80,6 +81,50 @@ export interface Position {
   payment: number
   frequency: 'Daily' | 'Weekly' | 'Monthly'
   estimatedBalance: number
+  autoDetected?: boolean
+  confirmed?: boolean | null
+}
+
+export interface AIMonthlyRevenue {
+  month: string // YYYY-MM
+  deposits: number
+  withdrawals: number
+  net: number
+}
+
+export interface AIMCAPosition {
+  lender: string
+  payment: number
+  frequency: 'Daily' | 'Weekly' | 'Monthly'
+  estimatedBalance: number
+  reasoning: string
+}
+
+export interface AIRiskAssessment {
+  level: 'low' | 'moderate' | 'high'
+  score: number
+  factors: string[]
+}
+
+export interface AIAnalysis {
+  monthlyRevenues: AIMonthlyRevenue[]
+  avgMonthlyIncome: number
+  avgMonthlyWithdrawals: number
+  avgMonthlyNet: number
+  annualIncome: number
+  nsfs: number
+  negativeDays: number
+  avgDailyBalance: number
+  avgDailyDeposit: number
+  risk: AIRiskAssessment
+  mcaPositions: AIMCAPosition[]
+  existingDailyObligation: number
+  existingMonthlyPayments: number
+  insights: string[]
+  dealSummary: string
+  monthsOfStatements: number
+  totalTransactions: number
+  analyzedAt: string
 }
 
 export interface ChatMessage {

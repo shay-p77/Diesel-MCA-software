@@ -1,4 +1,4 @@
-import { Deal, ChatMessage, User, AuthResponse } from '../types'
+import { Deal, ChatMessage, User, AuthResponse, AIAnalysis } from '../types'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
@@ -61,10 +61,12 @@ class ApiService {
 
   async createDeal(data: {
     businessName?: string
+    ownerName?: string
     amountRequested?: number
     dateSubmitted?: string
     broker?: string
     notes?: string
+    industry?: string
   }): Promise<Deal> {
     return this.fetch('/deals', {
       method: 'POST',
@@ -74,15 +76,53 @@ class ApiService {
 
   async updateDeal(id: string, data: {
     businessName?: string
+    ownerName?: string
     amountRequested?: number
     dateSubmitted?: string
     broker?: string
     notes?: string
+    industry?: string
   }): Promise<Deal> {
     return this.fetch(`/deals/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     })
+  }
+
+  // Extract metadata from PDFs using Claude AI (pre-deal-creation)
+  async extractMetadata(files: File[]): Promise<{
+    metadata: {
+      businessName: string | null
+      ownerName: string | null
+      amountRequested: number | null
+      industry: string | null
+      broker: string | null
+    }
+    message?: string
+  }> {
+    const formData = new FormData()
+    files.forEach(file => {
+      formData.append('files', file)
+    })
+
+    const token = this.getToken()
+    const headers: Record<string, string> = {}
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`
+    }
+
+    const response = await fetch(`${API_BASE}/deals/extract-metadata`, {
+      method: 'POST',
+      body: formData,
+      headers,
+    })
+
+    if (!response.ok) {
+      const error = await response.json().catch(() => ({ error: 'Extraction failed' }))
+      throw new Error(error.error || 'Extraction failed')
+    }
+
+    return response.json()
   }
 
   async updateDealStatus(
@@ -160,6 +200,25 @@ class ApiService {
     return this.fetch(`/deals/${dealId}/chat`, {
       method: 'POST',
       body: JSON.stringify({ message, history }),
+    })
+  }
+
+  // Confirm or reject an auto-detected MCA position
+  async confirmMCAPosition(
+    dealId: string,
+    lender: string,
+    confirmed: boolean
+  ): Promise<Deal> {
+    return this.fetch(`/deals/${dealId}/mca-position`, {
+      method: 'POST',
+      body: JSON.stringify({ lender, confirmed }),
+    })
+  }
+
+  // Run Claude AI analysis on extracted data
+  async analyzeDeal(dealId: string): Promise<{ analysis: AIAnalysis; deal: Deal }> {
+    return this.fetch(`/deals/${dealId}/analyze`, {
+      method: 'POST',
     })
   }
 

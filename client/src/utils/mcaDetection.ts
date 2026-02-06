@@ -69,7 +69,9 @@ export function detectMCAPositions(transactions: Transaction[]): Position[] {
     lender: pattern.counterparty,
     payment: Math.abs(pattern.avgAmount),
     frequency: pattern.frequency,
-    estimatedBalance: Math.abs(pattern.avgAmount) * pattern.occurrences // Rough estimate
+    estimatedBalance: Math.abs(pattern.avgAmount) * pattern.occurrences, // Rough estimate
+    autoDetected: true,
+    confirmed: null
   }))
 }
 

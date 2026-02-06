@@ -1,14 +1,23 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
+import { pdfjs } from 'react-pdf'
 import Header from '../../components/Header'
 import { SummaryTab, ChatTab, CalculatorTab } from '../../components/Sidebar'
 import DealModal from '../../components/DealModal'
-import PDFViewer from '../../components/PDFViewer/PDFViewer'
+import PDFViewer, { countOccurrences } from '../../components/PDFViewer/PDFViewer'
+import type { CrossStatementResult } from '../../components/PDFViewer/PDFViewer'
 import { api } from '../../services/api'
 import { Deal } from '../../types'
 import './DealDetail.css'
 
 type TabType = 'summary' | 'chat' | 'calculator'
+
+export interface CalculatorState {
+  fundingAmount: string
+  factorRate: string
+  termWeeks: string
+  paymentFrequency: 'daily' | 'weekly'
+}
 
 export default function DealDetail() {
   const { id } = useParams<{ id: string }>()
@@ -21,7 +30,29 @@ export default function DealDetail() {
   const [statusUpdating, setStatusUpdating] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [selectedAccountIndex, setSelectedAccountIndex] = useState(0)
+  const [crossStatementResults, setCrossStatementResults] = useState<CrossStatementResult[]>([])
+  const [searchTerm, setSearchTerm] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const scrollPositionsRef = useRef<Map<number, number>>(new Map())
+  const pdfScrollContainerRef = useRef<HTMLDivElement | null>(null)
+
+  // Lifted calculator state (shared between CalculatorTab and SummaryTab)
+  const [calcState, setCalcState] = useState<CalculatorState>({
+    fundingAmount: '50000',
+    factorRate: '1.35',
+    termWeeks: '24',
+    paymentFrequency: 'daily',
+  })
+
+  // Initialize calculator funding amount when deal loads
+  useEffect(() => {
+    if (deal) {
+      setCalcState(prev => ({
+        ...prev,
+        fundingAmount: deal.amountRequested.toString(),
+      }))
+    }
+  }, [deal?.id])
 
   const handleStatusChange = async (newStatus: 'pending' | 'under_review' | 'approved' | 'declined') => {
     if (!deal || statusUpdating) return
@@ -106,6 +137,100 @@ export default function DealDetail() {
     }
   }
 
+  // Save scroll position before switching statements
+  const handleStatementSwitch = useCallback((newIndex: number) => {
+    // Save current scroll position
+    if (pdfScrollContainerRef.current) {
+      scrollPositionsRef.current.set(selectedAccountIndex, pdfScrollContainerRef.current.scrollTop)
+    }
+    // If there's an active search, clear the saved scroll for the target
+    // so the auto-search scroll takes priority
+    if (searchTerm) {
+      scrollPositionsRef.current.delete(newIndex)
+    }
+    setSelectedAccountIndex(newIndex)
+  }, [selectedAccountIndex, searchTerm])
+
+  // Callback for PDFViewer to register its scroll container
+  const handleScrollContainerRef = useCallback((ref: HTMLDivElement | null) => {
+    pdfScrollContainerRef.current = ref
+  }, [])
+
+  // Cross-statement search: when user searches in one PDF, check others
+  const handleSearchTermChange = useCallback(async (term: string) => {
+    setSearchTerm(term)
+
+    if (!term || !deal || !deal.bankAccounts || deal.bankAccounts.length === 0) {
+      setCrossStatementResults([])
+      return
+    }
+
+    // Build allPdfSources inline (same logic as render)
+    const sources = deal.bankAccounts.flatMap((account, accountIndex) => {
+      if (account.statements && account.statements.length > 0) {
+        return account.statements.map((stmt, stmtIndex) => ({
+          id: stmt.id,
+          label: `${account.accountName || `Account ${accountIndex + 1}`} - Stmt ${stmtIndex + 1}`,
+          fileName: stmt.pdfFileName || 'statement.pdf'
+        }))
+      }
+      return [{
+        id: account.id,
+        label: account.accountName || `Account ${accountIndex + 1}`,
+        fileName: account.pdfFileName || 'statement.pdf'
+      }]
+    })
+
+    if (sources.length <= 1) {
+      setCrossStatementResults([])
+      return
+    }
+
+    const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'
+    const results: CrossStatementResult[] = []
+    const query = term.toLowerCase()
+
+    // Search all OTHER statements (not the currently selected one)
+    await Promise.all(
+      sources.map(async (source, index) => {
+        if (index === selectedAccountIndex) return
+
+        try {
+          const pdfUrl = `${baseUrl}/api/deals/${deal.id}/pdf/${source.id}`
+          const pdf = await pdfjs.getDocument(pdfUrl).promise
+          let totalCount = 0
+
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i)
+            const textContent = await page.getTextContent()
+
+            // Use the same countOccurrences function as DOM highlighting
+            for (const item of textContent.items) {
+              const str = (item as any).str?.toLowerCase() || ''
+              totalCount += countOccurrences(str, query)
+            }
+          }
+
+          if (totalCount > 0) {
+            results.push({
+              statementIndex: index,
+              label: source.fileName.replace('.pdf', '').replace(/\s*\(\d+\)$/, ''),
+              count: totalCount
+            })
+          }
+
+          pdf.destroy()
+        } catch (err) {
+          console.error(`Failed to search statement ${source.id}:`, err)
+        }
+      })
+    )
+
+    // Sort by count descending
+    results.sort((a, b) => b.count - a.count)
+    setCrossStatementResults(results)
+  }, [deal, selectedAccountIndex])
+
   if (loading) {
     return (
       <div className="deal-detail">
@@ -155,6 +280,9 @@ export default function DealDetail() {
 
   // Get the currently selected PDF
   const selectedPdf = allPdfSources[selectedAccountIndex] || allPdfSources[0]
+
+  // Get saved scroll position for the selected statement
+  const savedScrollPosition = scrollPositionsRef.current.get(selectedAccountIndex) || 0
 
   return (
     <div className="deal-detail">
@@ -210,31 +338,28 @@ export default function DealDetail() {
         <div className="pdf-viewer">
           {hasPdf ? (
             <>
-              {/* Statement Selector and Add Button */}
+              {/* Statement Tabs and Add Button */}
               {hasMultipleAccounts && (
-                <div className="account-selector">
+                <div className="statement-tabs-bar">
                   {allPdfSources.length > 1 && (
-                    <>
-                      <label htmlFor="account-select">View Statement:</label>
-                      <select
-                        id="account-select"
-                        value={selectedAccountIndex}
-                        onChange={(e) => setSelectedAccountIndex(Number(e.target.value))}
-                      >
-                        {allPdfSources.map((pdf, index) => (
-                          <option key={pdf.id} value={index}>
-                            {pdf.label}
-                          </option>
-                        ))}
-                      </select>
-                    </>
+                    <div className="statement-tabs">
+                      {allPdfSources.map((pdf, index) => (
+                        <button
+                          key={pdf.id}
+                          className={`statement-tab ${index === selectedAccountIndex ? 'active' : ''}`}
+                          onClick={() => handleStatementSwitch(index)}
+                        >
+                          {pdf.fileName.replace('.pdf', '').replace(/\s*\(\d+\)$/, '')}
+                        </button>
+                      ))}
+                    </div>
                   )}
                   <button
                     className="btn-add-account"
                     onClick={() => fileInputRef.current?.click()}
                     disabled={uploading}
                   >
-                    {uploading ? 'Uploading...' : '+ Add Statements'}
+                    {uploading ? 'Uploading...' : '+ Add'}
                   </button>
                   <input
                     type="file"
@@ -249,13 +374,22 @@ export default function DealDetail() {
 
               {hasMultipleAccounts && selectedPdf ? (
                 <PDFViewer
+                  key={selectedPdf.id}
                   pdfUrl={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/deals/${deal.id}/pdf/${selectedPdf.id}`}
                   fileName={selectedPdf.fileName}
+                  savedScrollPosition={savedScrollPosition}
+                  onScrollContainerRef={handleScrollContainerRef}
+                  onSearchTermChange={handleSearchTermChange}
+                  crossStatementResults={crossStatementResults}
+                  onSwitchStatement={handleStatementSwitch}
+                  initialSearchTerm={searchTerm}
                 />
               ) : (
                 <PDFViewer
                   pdfUrl={`${import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000'}/api/deals/${deal.id}/pdf`}
                   fileName={deal.pdfFileName || 'document.pdf'}
+                  savedScrollPosition={0}
+                  onScrollContainerRef={handleScrollContainerRef}
                 />
               )}
             </>
@@ -308,9 +442,21 @@ export default function DealDetail() {
           </div>
 
           <div className="sidebar-content">
-            {activeTab === 'summary' && <SummaryTab deal={deal} onEditDeal={() => setIsEditModalOpen(true)} />}
+            {activeTab === 'summary' && (
+              <SummaryTab
+                deal={deal}
+                onEditDeal={() => setIsEditModalOpen(true)}
+                calcState={calcState}
+              />
+            )}
             {activeTab === 'chat' && <ChatTab deal={deal} />}
-            {activeTab === 'calculator' && <CalculatorTab deal={deal} />}
+            {activeTab === 'calculator' && (
+              <CalculatorTab
+                deal={deal}
+                calcState={calcState}
+                onCalcStateChange={setCalcState}
+              />
+            )}
           </div>
         </div>
       </div>

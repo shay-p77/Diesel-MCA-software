@@ -411,82 +411,427 @@
   color: #1e40af;
 }
 
-
-/* =============================================================================
-   ORIGINAL CSS (kept for reference)
-   =============================================================================
-
-.data-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 0.75rem;
-}
-
-.data-item {
+/* Positions Section */
+.positions-section h4 {
   display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
+  align-items: center;
+  gap: 0.5rem;
 }
 
-.data-item .label {
+.auto-detected-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: #16a34a;
+  color: white;
   font-size: 0.625rem;
-  color: #888;
+  font-weight: 600;
+  border-radius: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
-.data-item .value {
-  font-size: 1rem;
+.positions-section h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.75rem;
   font-weight: 600;
-  color: #333;
+  color: #555;
+  text-transform: uppercase;
+}
+
+.position-group {
+  margin-bottom: 1rem;
+}
+
+.position-group:last-child {
+  margin-bottom: 0;
 }
 
 .positions-table {
   width: 100%;
   border-collapse: collapse;
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
 }
 
-.positions-table th,
-.positions-table td {
-  padding: 0.5rem;
+.positions-table thead th {
   text-align: left;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.positions-table th {
+  padding: 0.5rem;
+  background: #e9ecef;
   font-weight: 600;
-  font-size: 0.6875rem;
-  text-transform: uppercase;
-  color: #666;
-  background: #eee;
+  color: #555;
+  border-bottom: 2px solid #dee2e6;
 }
 
-.position-totals {
-  margin-top: 0.75rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #ddd;
+.positions-table tbody td {
+  padding: 0.5rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.positions-table tbody tr:hover {
+  background: #f8f9fa;
+}
+
+.positions-table tbody tr.row-unreviewed {
+  background: #fffbeb;
+}
+
+/* MCA Review Cards */
+.mca-review-list {
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
 }
 
-.total-item {
+.mca-review-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  padding: 0.75rem;
+  border-left: 3px solid #f59e0b;
+  transition: all 0.2s;
+}
+
+.mca-review-card.confirmed {
+  border-left-color: #16a34a;
+  background: #f0fdf4;
+}
+
+.mca-review-card.rejected {
+  border-left-color: #9ca3af;
+  background: #f9fafb;
+  opacity: 0.7;
+}
+
+.mca-review-info {
   display: flex;
-  justify-content: space-between;
-  font-size: 0.8125rem;
+  flex-direction: column;
+  gap: 0.125rem;
+  margin-bottom: 0.5rem;
 }
 
-.info-grid {
+.mca-review-lender {
+  font-weight: 600;
+  font-size: 0.8125rem;
+  color: #333;
+}
+
+.mca-review-details {
+  font-size: 0.75rem;
+  color: #555;
+}
+
+.mca-review-balance {
+  font-size: 0.6875rem;
+  color: #888;
+}
+
+.mca-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.mca-review-prompt {
+  font-size: 0.6875rem;
+  color: #92400e;
+  font-weight: 500;
+  margin-right: auto;
+}
+
+.btn-mca-yes {
+  padding: 0.25rem 0.75rem;
+  background: #16a34a;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-mca-yes:hover {
+  background: #15803d;
+}
+
+.btn-mca-no {
+  padding: 0.25rem 0.75rem;
+  background: white;
+  color: #666;
+  border: 1px solid #d1d5db;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-mca-no:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.mca-review-status {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  margin-right: auto;
+}
+
+.mca-review-status.confirmed {
+  color: #16a34a;
+}
+
+.mca-review-status.rejected {
+  color: #9ca3af;
+}
+
+.btn-mca-undo {
+  padding: 0.125rem 0.5rem;
+  background: transparent;
+  color: #6b7280;
+  border: 1px solid #d1d5db;
+  border-radius: 3px;
+  font-size: 0.625rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-mca-undo:hover {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+/* Key Metrics Section */
+.metrics-grid {
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
 }
 
-.info-item {
+.metric-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.75rem;
+}
+
+.metric-item.highlight {
+  background: #e7f3ff;
+  border: 1px solid #3d6b99;
+  font-weight: 600;
+}
+
+.metric-item .label {
+  color: #666;
+  flex: 1;
+}
+
+.metric-item .value {
+  font-weight: 600;
+  color: #3d6b99;
+  white-space: nowrap;
+}
+
+/* Monthly Revenues Section */
+.revenues-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.5rem;
+}
+
+.revenue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 6px;
+  border: 1px solid #e0e0e0;
+}
+
+.revenue-item .month-label {
+  font-size: 0.75rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.revenue-item .revenue-value {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #16a34a;
+}
+
+/* Position Stacking */
+.stacking-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.stack-item {
   display: flex;
   justify-content: space-between;
   font-size: 0.8125rem;
+  padding: 0.25rem 0;
 }
 
-============================================================================= */
+.stack-item .label {
+  color: #666;
+}
+
+.stack-item .value {
+  font-weight: 500;
+}
+
+.stack-item.total {
+  padding-top: 0.5rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid #ddd;
+}
+
+.stack-item.total .label,
+.stack-item.total .value {
+  font-weight: 600;
+  color: #333;
+}
+
+/* Utilization */
+.utilization {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid #ddd;
+}
+
+.utilization-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  margin-bottom: 0.5rem;
+}
+
+.utilization-header .good {
+  color: #16a34a;
+  font-weight: 600;
+}
+
+.utilization-header .warning {
+  color: #ea580c;
+  font-weight: 600;
+}
+
+.utilization-header .danger {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.utilization-bar {
+  height: 8px;
+  background: #e0e0e0;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.utilization-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+
+.utilization-fill.good {
+  background: #16a34a;
+}
+
+.utilization-fill.warning {
+  background: #ea580c;
+}
+
+.utilization-fill.danger {
+  background: #dc2626;
+}
+
+.utilization-note {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.75rem;
+  color: #888;
+}
+
+/* Re-analyze Button */
+.btn-reanalyze {
+  margin-left: auto;
+  padding: 0.25rem 0.625rem;
+  background: #1e40af;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-reanalyze:hover:not(:disabled) {
+  background: #1e3a8a;
+}
+
+.btn-reanalyze:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Analysis Loading */
+.analysis-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 2rem 1rem;
+}
+
+.analysis-loading p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #475569;
+}
+
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #1e40af;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.analysis-error {
+  color: #dc2626;
+  font-size: 0.875rem;
+  margin: 0 0 0.75rem 0;
+}
+
+/* Risk Factors */
+.risk-factors {
+  margin: 0.75rem 0 0 0;
+  padding: 0 0 0 1.25rem;
+  font-size: 0.8125rem;
+  color: #475569;
+}
+
+.risk-factors li {
+  margin-bottom: 0.25rem;
+  line-height: 1.4;
+}
+
+/* MCA Reasoning */
+.mca-reasoning {
+  font-size: 0.6875rem;
+  color: #6b7280;
+  font-style: italic;
+  margin-top: 0.25rem;
+}

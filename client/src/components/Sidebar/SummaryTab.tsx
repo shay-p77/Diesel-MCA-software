@@ -1,52 +1,63 @@
 import { useState, useEffect } from 'react'
-import { Deal, BankAccount } from '../../types'
+import { Deal, BankAccount, AIAnalysis } from '../../types'
 import { api } from '../../services/api'
+import type { CalculatorState } from '../../pages/DealDetail/DealDetail'
 import './SummaryTab.css'
 
 interface SummaryTabProps {
   deal: Deal
   onEditDeal?: () => void
+  calcState: CalculatorState
 }
 
-export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
+export default function SummaryTab({ deal, onEditDeal, calcState }: SummaryTabProps) {
   const [activeView, setActiveView] = useState<'extracted' | 'analysis'>('extracted')
   const [expandedAccounts, setExpandedAccounts] = useState<Set<string>>(new Set())
-  const [generatingSummary, setGeneratingSummary] = useState(false)
+  const [analyzing, setAnalyzing] = useState(false)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const [localDeal, setLocalDeal] = useState(deal)
+  const [positionReviews, setPositionReviews] = useState<Record<string, boolean | null>>({})
 
   // Update local deal when prop changes
   useEffect(() => {
     setLocalDeal(deal)
   }, [deal])
 
-  // Auto-generate summary when switching to analysis view if not already generated
+  // Auto-trigger analysis when switching to analysis view if not already analyzed
   useEffect(() => {
-    const shouldGenerate =
+    const shouldAnalyze =
       activeView === 'analysis' &&
-      !localDeal.aiSummary &&
-      !generatingSummary &&
+      !localDeal.aiAnalysis &&
+      !analyzing &&
       localDeal.extractionStatus === 'done'
 
-    if (shouldGenerate) {
-      handleGenerateSummary()
+    if (shouldAnalyze) {
+      handleAnalyze()
     }
-  }, [activeView, localDeal.aiSummary, localDeal.extractionStatus])
+  }, [activeView, localDeal.aiAnalysis, localDeal.extractionStatus])
 
-  const handleGenerateSummary = async () => {
-    setGeneratingSummary(true)
+  const handleAnalyze = async () => {
+    setAnalyzing(true)
+    setAnalyzeError(null)
     try {
-      const result = await api.generateSummary(localDeal.id)
+      const result = await api.analyzeDeal(localDeal.id)
       setLocalDeal(result.deal)
-    } catch (err) {
-      console.error('Failed to generate summary:', err)
+    } catch (err: any) {
+      console.error('Failed to analyze deal:', err)
+      setAnalyzeError(err.message || 'Analysis failed')
     } finally {
-      setGeneratingSummary(false)
+      setAnalyzing(false)
     }
   }
 
-  const dailyObligation = localDeal.existingPositions
-    .filter(p => p.frequency === 'Daily')
-    .reduce((sum, p) => sum + p.payment, 0)
+  const handlePositionReview = async (lender: string, confirmed: boolean) => {
+    setPositionReviews(prev => ({ ...prev, [lender]: confirmed }))
+    try {
+      await api.confirmMCAPosition(localDeal.id, lender, confirmed)
+    } catch {
+      // State is saved locally regardless
+    }
+  }
 
   const toggleAccount = (accountId: string) => {
     setExpandedAccounts(prev => {
@@ -64,7 +75,7 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
   const hasMultipleAccounts = localDeal.bankAccounts && localDeal.bankAccounts.length > 0
   const useLegacyData = !hasMultipleAccounts && localDeal.bankData
 
-  // Calculate aggregated data across all accounts
+  // Calculate aggregated data across all accounts (for Extracted Data tab)
   const aggregatedData = hasMultipleAccounts ? localDeal.bankAccounts.reduce((acc, account) => ({
     totalDeposits: acc.totalDeposits + account.bankData.totalDeposits,
     totalWithdrawals: acc.totalWithdrawals + account.bankData.totalWithdrawals,
@@ -82,94 +93,58 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
     ? localDeal.bankAccounts.reduce((sum, acc) => sum + (acc.internalTransfers?.length || 0), 0)
     : 0
 
-  // Get bankData for AI insights (use first account or legacy)
-  const primaryBankData = hasMultipleAccounts
-    ? localDeal.bankAccounts[0]?.bankData
-    : localDeal.bankData
+  // ===== Claude AI Analysis data =====
+  const analysis: AIAnalysis | null = localDeal.aiAnalysis
 
-  // Mock AI insights based on the extracted data
-  const aiInsights = [
-    {
-      type: localDeal.existingPositions.length > 2 ? 'warning' : localDeal.existingPositions.length > 0 ? 'info' : 'positive',
-      text: localDeal.existingPositions.length > 2
-        ? `High stacking: ${localDeal.existingPositions.length} existing positions with $${dailyObligation}/day obligation`
-        : localDeal.existingPositions.length > 0
-        ? `${localDeal.existingPositions.length} existing position(s) detected - moderate stacking`
-        : 'No existing positions - clean account'
-    },
-    {
-      type: primaryBankData?.nsfs && primaryBankData.nsfs > 2 ? 'warning' : primaryBankData?.nsfs && primaryBankData.nsfs > 0 ? 'info' : 'positive',
-      text: primaryBankData?.nsfs && primaryBankData.nsfs > 2
-        ? `${primaryBankData.nsfs} NSFs detected - cash flow concerns`
-        : primaryBankData?.nsfs && primaryBankData.nsfs > 0
-        ? `${primaryBankData.nsfs} NSF(s) - minor concern`
-        : 'No NSFs - healthy account management'
-    },
-    {
-      type: primaryBankData?.negativeDays && primaryBankData.negativeDays > 0 ? 'warning' : 'positive',
-      text: primaryBankData?.negativeDays && primaryBankData.negativeDays > 0
-        ? `Account went negative ${primaryBankData.negativeDays} day(s)`
-        : 'No negative balance days'
-    },
-    {
-      type: 'info',
-      text: `Daily deposit average: $${primaryBankData?.dailyAvgDeposit?.toLocaleString() || 'N/A'}`
-    }
-  ]
+  // ===== Calculator-derived values (real-time, depend on user inputs) =====
+  const { fundingAmount, factorRate, termWeeks, paymentFrequency } = calcState
+  const amount = parseFloat(fundingAmount) || 0
+  const factor = parseFloat(factorRate) || 1
+  const weeks = parseInt(termWeeks) || 1
 
-  if (totalInternalTransfers > 0) {
-    aiInsights.unshift({
-      type: 'info',
-      text: `${totalInternalTransfers} internal transfer(s) detected between accounts`
-    })
-  }
+  const paybackAmount = amount * factor
+  const totalPayments = paymentFrequency === 'daily' ? weeks * 5 : weeks
+  const paymentAmount = paybackAmount / totalPayments
 
-  const getRiskLevel = () => {
-    let score = 0
+  const dieselMonthlyPayment = paymentFrequency === 'daily'
+    ? paymentAmount * 22
+    : paymentAmount * 4.33
 
-    // Check existing positions (stacking)
-    if (localDeal.existingPositions.length > 3) score += 3
-    else if (localDeal.existingPositions.length > 1) score += 1
+  const lengthOfDealMonths = weeks / 4.33
 
-    // Check NSFs
-    if (primaryBankData?.nsfs && primaryBankData.nsfs > 3) score += 3
-    else if (primaryBankData?.nsfs && primaryBankData.nsfs > 0) score += 1
+  // Calculator metrics that combine Claude's base numbers with calc state
+  // Recalculate obligations from active (non-rejected) positions
+  const activePositions = (analysis?.mcaPositions || []).filter(
+    p => positionReviews[p.lender] !== false
+  )
+  const existingDailyObligation = activePositions.reduce((sum, p) => {
+    if (p.frequency === 'Daily') return sum + p.payment
+    if (p.frequency === 'Weekly') return sum + p.payment / 5
+    if (p.frequency === 'Monthly') return sum + p.payment / 22
+    return sum
+  }, 0)
+  const existingMonthlyPayments = activePositions.reduce((sum, p) => {
+    if (p.frequency === 'Daily') return sum + p.payment * 22
+    if (p.frequency === 'Weekly') return sum + p.payment * 4.33
+    if (p.frequency === 'Monthly') return sum + p.payment
+    return sum
+  }, 0)
+  const avgMonthlyIncome = analysis?.avgMonthlyIncome || 0
+  const avgMonthlyWithdrawals = analysis?.avgMonthlyWithdrawals || 0
+  const annualIncome = analysis?.annualIncome || 0
+  const avgDailyDeposit = analysis?.avgDailyDeposit || 0
 
-    // Check negative days
-    if (primaryBankData?.negativeDays && primaryBankData.negativeDays > 3) score += 2
+  const newDailyObligation = paymentFrequency === 'daily' ? paymentAmount : paymentAmount / 5
+  const totalDailyObligation = existingDailyObligation + newDailyObligation
+  const totalMonthlyWithDiesel = existingMonthlyPayments + dieselMonthlyPayment
 
-    // Check funding request vs. total deposits ratio
-    const totalDeposits = hasMultipleAccounts
-      ? aggregatedData?.totalDeposits || 0
-      : primaryBankData?.totalDeposits || 0
+  const deductions = avgMonthlyWithdrawals - existingMonthlyPayments
+  const monthlyNetRevenue = avgMonthlyIncome - avgMonthlyWithdrawals
 
-    if (totalDeposits > 0 && localDeal.amountRequested > 0) {
-      const fundingToDepositsRatio = localDeal.amountRequested / totalDeposits
-      if (fundingToDepositsRatio > 10) score += 5  // Requesting 10x+ their deposits = severe
-      else if (fundingToDepositsRatio > 5) score += 3  // Requesting 5-10x their deposits = high
-      else if (fundingToDepositsRatio > 2) score += 1  // Requesting 2-5x their deposits = moderate
-    }
-
-    // Check if daily deposits can support repayment (MCA typically takes 10-20% of daily)
-    const dailyDeposit = primaryBankData?.dailyAvgDeposit || 0
-    if (dailyDeposit > 0 && localDeal.amountRequested > 0) {
-      // Estimate: if 15% of daily deposits, how many days to repay?
-      const estimatedDailyPayment = dailyDeposit * 0.15
-      const daysToRepay = localDeal.amountRequested / estimatedDailyPayment
-      if (daysToRepay > 365) score += 4  // Would take over a year = severe risk
-      else if (daysToRepay > 180) score += 2  // Would take 6+ months = higher risk
-    }
-
-    // Very low deposits relative to any meaningful funding
-    if (totalDeposits < 100 && localDeal.amountRequested > 1000) score += 4
-
-    if (score >= 6) return { level: 'Severe Risk', class: 'risk-severe' }
-    if (score >= 4) return { level: 'High Risk', class: 'risk-high' }
-    if (score >= 2) return { level: 'Moderate Risk', class: 'risk-moderate' }
-    return { level: 'Low Risk', class: 'risk-low' }
-  }
-
-  const risk = getRiskLevel()
+  const holdbackPercent = avgMonthlyIncome > 0 ? (totalMonthlyWithDiesel / avgMonthlyIncome) * 100 : 0
+  const paymentToIncomePercent = avgMonthlyIncome > 0 ? (dieselMonthlyPayment / avgMonthlyIncome) * 100 : 0
+  const balanceToAnnualIncomePercent = annualIncome > 0 ? (paybackAmount / annualIncome) * 100 : 0
+  const utilizationPercent = avgDailyDeposit > 0 ? (totalDailyObligation / avgDailyDeposit) * 100 : 0
 
   const renderBankAccountData = (account: BankAccount, index: number) => (
     <div key={account.id} className="bank-account-section">
@@ -241,6 +216,25 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
     </div>
   )
 
+  // Risk badge class from Claude's risk level
+  const getRiskClass = (level: string) => {
+    switch (level) {
+      case 'low': return 'risk-low'
+      case 'moderate': return 'risk-moderate'
+      case 'high': return 'risk-high'
+      default: return 'risk-moderate'
+    }
+  }
+
+  const getRiskLabel = (level: string) => {
+    switch (level) {
+      case 'low': return 'Low Risk'
+      case 'moderate': return 'Moderate Risk'
+      case 'high': return 'High Risk'
+      default: return level
+    }
+  }
+
   return (
     <div className="summary-tab">
       {/* Toggle between Extracted Data and AI Analysis */}
@@ -268,6 +262,46 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
             <span className="source-icon">⚡</span>
             <span>Data extracted by <strong>Koncile</strong></span>
           </div>
+
+          {/* Deal Info */}
+          <section className="summary-section">
+            <div className="section-header">
+              <h4>Deal Information</h4>
+              {onEditDeal && (
+                <button className="btn-edit-deal" onClick={onEditDeal}>
+                  Edit
+                </button>
+              )}
+            </div>
+            <table className="spreadsheet-table">
+              <tbody>
+                <tr>
+                  <td className="cell-label">Business</td>
+                  <td className="cell-value">{localDeal.businessName}</td>
+                </tr>
+                <tr>
+                  <td className="cell-label">Requesting</td>
+                  <td className="cell-value">${localDeal.amountRequested.toLocaleString()}</td>
+                </tr>
+                <tr>
+                  <td className="cell-label">Submitted</td>
+                  <td className="cell-value">{new Date(localDeal.dateSubmitted).toLocaleDateString()}</td>
+                </tr>
+                {localDeal.broker && (
+                  <tr>
+                    <td className="cell-label">Broker / ISO</td>
+                    <td className="cell-value">{localDeal.broker}</td>
+                  </tr>
+                )}
+                {localDeal.notes && (
+                  <tr>
+                    <td className="cell-label">Notes</td>
+                    <td className="cell-value">{localDeal.notes}</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </section>
 
           {/* Multi-Account Summary */}
           {hasMultipleAccounts && (
@@ -359,83 +393,6 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
               </table>
             </section>
           )}
-
-          {/* Existing Positions */}
-          <section className="summary-section spreadsheet-section">
-            <h4>Detected Positions ({localDeal.existingPositions.length})</h4>
-            {localDeal.existingPositions.length > 0 ? (
-              <>
-                <table className="spreadsheet-table positions">
-                  <thead>
-                    <tr>
-                      <th>Lender</th>
-                      <th>Payment</th>
-                      <th>Freq</th>
-                      <th>Est. Bal</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {localDeal.existingPositions.map((pos, i) => (
-                      <tr key={i}>
-                        <td>{pos.lender}</td>
-                        <td>${pos.payment.toLocaleString()}</td>
-                        <td>{pos.frequency}</td>
-                        <td>${pos.estimatedBalance.toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                  <tfoot>
-                    <tr>
-                      <td colSpan={2}><strong>Total Daily</strong></td>
-                      <td colSpan={2}><strong>${dailyObligation.toLocaleString()}/day</strong></td>
-                    </tr>
-                  </tfoot>
-                </table>
-              </>
-            ) : (
-              <p className="no-positions">No existing positions detected</p>
-            )}
-          </section>
-
-          {/* Deal Info */}
-          <section className="summary-section">
-            <div className="section-header">
-              <h4>Deal Information</h4>
-              {onEditDeal && (
-                <button className="btn-edit-deal" onClick={onEditDeal}>
-                  Edit
-                </button>
-              )}
-            </div>
-            <table className="spreadsheet-table">
-              <tbody>
-                <tr>
-                  <td className="cell-label">Business</td>
-                  <td className="cell-value">{localDeal.businessName}</td>
-                </tr>
-                <tr>
-                  <td className="cell-label">Requesting</td>
-                  <td className="cell-value">${localDeal.amountRequested.toLocaleString()}</td>
-                </tr>
-                <tr>
-                  <td className="cell-label">Submitted</td>
-                  <td className="cell-value">{new Date(localDeal.dateSubmitted).toLocaleDateString()}</td>
-                </tr>
-                {localDeal.broker && (
-                  <tr>
-                    <td className="cell-label">Broker / ISO</td>
-                    <td className="cell-value">{localDeal.broker}</td>
-                  </tr>
-                )}
-                {localDeal.notes && (
-                  <tr>
-                    <td className="cell-label">Notes</td>
-                    <td className="cell-value">{localDeal.notes}</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </section>
         </>
       ) : (
         <>
@@ -443,57 +400,315 @@ export default function SummaryTab({ deal, onEditDeal }: SummaryTabProps) {
           <div className="source-badge ai-badge">
             <span className="source-icon">🤖</span>
             <span>Analysis by <strong>Claude AI</strong></span>
+            {analysis && (
+              <button className="btn-reanalyze" onClick={handleAnalyze} disabled={analyzing}>
+                {analyzing ? 'Re-analyzing...' : 'Re-analyze'}
+              </button>
+            )}
           </div>
 
-          {/* Risk Assessment */}
-          <section className="summary-section ai-section">
-            <h4>Risk Assessment</h4>
-            <div className={`risk-badge ${risk.class}`}>
-              {risk.level}
-            </div>
-            <p className="ai-note">Based on extracted Koncile data</p>
-          </section>
+          {/* Loading / Error states */}
+          {analyzing && !analysis && (
+            <section className="summary-section ai-section">
+              <div className="analysis-loading">
+                <div className="loading-spinner" />
+                <p>Claude is analyzing {localDeal.bankAccounts?.reduce((sum, a) => sum + (a.bankData?.transactions?.length || 0), 0) || 0} transactions...</p>
+                <p className="ai-note">This may take 15-30 seconds</p>
+              </div>
+            </section>
+          )}
 
-          {/* AI Summary */}
-          <section className="summary-section ai-section">
-            <h4>Deal Summary</h4>
-            {generatingSummary ? (
-              <p className="ai-summary loading">Generating summary...</p>
-            ) : localDeal.aiSummary ? (
-              <p className="ai-summary">{localDeal.aiSummary}</p>
-            ) : (
-              <p className="ai-summary empty">
-                {localDeal.extractionStatus === 'done'
-                  ? 'Summary will be generated automatically...'
-                  : 'Upload bank statements to generate AI summary'}
-              </p>
-            )}
-          </section>
+          {analyzeError && !analysis && (
+            <section className="summary-section ai-section">
+              <p className="analysis-error">{analyzeError}</p>
+              <button className="btn-reanalyze" onClick={handleAnalyze}>Retry</button>
+            </section>
+          )}
 
-          {/* AI Insights */}
-          <section className="summary-section ai-section">
-            <h4>Key Insights</h4>
-            <ul className="insights-list">
-              {aiInsights.map((insight, i) => (
-                <li key={i} className={`insight-item ${insight.type}`}>
-                  {insight.type === 'warning' && '⚠️ '}
-                  {insight.type === 'positive' && '✓ '}
-                  {insight.type === 'info' && 'ℹ️ '}
-                  {insight.text}
-                </li>
-              ))}
-            </ul>
-          </section>
+          {!analysis && !analyzing && !analyzeError && localDeal.extractionStatus !== 'done' && (
+            <section className="summary-section ai-section">
+              <p className="ai-summary empty">Upload bank statements to generate AI analysis</p>
+            </section>
+          )}
 
-          {/* Data Source Reference */}
-          <section className="summary-section data-reference">
-            <p>
-              <small>
-                This analysis is based on the Koncile-extracted data.
-                Switch to "Extracted Data" tab to verify the source numbers.
-              </small>
-            </p>
-          </section>
+          {/* All analysis sections rendered from Claude's data */}
+          {analysis && (
+            <>
+              {/* Risk Assessment */}
+              <section className="summary-section ai-section">
+                <h4>Risk Assessment</h4>
+                <div className={`risk-badge ${getRiskClass(analysis.risk.level)}`}>
+                  {getRiskLabel(analysis.risk.level)} ({analysis.risk.score}/10)
+                </div>
+                {analysis.risk.factors.length > 0 && (
+                  <ul className="risk-factors">
+                    {analysis.risk.factors.map((factor, i) => (
+                      <li key={i}>{factor}</li>
+                    ))}
+                  </ul>
+                )}
+              </section>
+
+              {/* Deal Summary */}
+              <section className="summary-section ai-section">
+                <h4>Deal Summary</h4>
+                <p className="ai-summary">{analysis.dealSummary}</p>
+                <p className="ai-note">
+                  Based on {analysis.totalTransactions} transactions across {analysis.monthsOfStatements} month(s)
+                </p>
+              </section>
+
+              {/* Key Insights */}
+              <section className="summary-section ai-section">
+                <h4>Key Insights</h4>
+                <ul className="insights-list">
+                  {analysis.insights.map((insight, i) => (
+                    <li key={i} className="insight-item info">
+                      {insight}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              {/* Claude's Bank Metrics */}
+              <section className="summary-section ai-section">
+                <h4>Bank Metrics (AI Computed)</h4>
+                <table className="spreadsheet-table">
+                  <tbody>
+                    <tr>
+                      <td className="cell-label">Avg Daily Balance</td>
+                      <td className="cell-value">${analysis.avgDailyBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr>
+                      <td className="cell-label">Avg Daily Deposit</td>
+                      <td className="cell-value">${analysis.avgDailyDeposit.toLocaleString(undefined, { maximumFractionDigits: 2 })}</td>
+                    </tr>
+                    <tr className={analysis.nsfs > 0 ? 'row-warning' : ''}>
+                      <td className="cell-label">NSF Count</td>
+                      <td className={`cell-value ${analysis.nsfs > 0 ? 'warning' : 'good'}`}>{analysis.nsfs}</td>
+                    </tr>
+                    <tr className={analysis.negativeDays > 0 ? 'row-warning' : ''}>
+                      <td className="cell-label">Negative Days</td>
+                      <td className={`cell-value ${analysis.negativeDays > 0 ? 'warning' : 'good'}`}>{analysis.negativeDays}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </section>
+
+              {/* Existing MCA Positions (from Claude) */}
+              <section className="summary-section positions-section">
+                <h4>
+                  Existing MCA Positions
+                  {analysis.mcaPositions.length > 0 && (
+                    <span className="auto-detected-badge">AI Detected</span>
+                  )}
+                </h4>
+
+                {analysis.mcaPositions.length > 0 ? (
+                  <div className="mca-review-list">
+                    {analysis.mcaPositions.map((pos, idx) => {
+                      const reviewStatus = positionReviews[pos.lender]
+                      const isConfirmed = reviewStatus === true
+                      const isRejected = reviewStatus === false
+                      return (
+                        <div
+                          key={idx}
+                          className={`mca-review-card ${isConfirmed ? 'confirmed' : ''} ${isRejected ? 'rejected' : ''}`}
+                        >
+                          <div className="mca-review-info">
+                            <span className="mca-review-lender">{pos.lender}</span>
+                            <span className="mca-review-details">
+                              ${pos.payment.toLocaleString()} / {pos.frequency.toLowerCase()}
+                              {pos.frequency === 'Daily' && ` ($${(pos.payment * 22).toLocaleString()}/mo)`}
+                              {pos.frequency === 'Weekly' && ` ($${(pos.payment * 4.33).toLocaleString(undefined, { maximumFractionDigits: 0 })}/mo)`}
+                            </span>
+                            <span className="mca-review-balance">Est. balance: ${pos.estimatedBalance.toLocaleString()}</span>
+                            <span className="mca-reasoning">{pos.reasoning}</span>
+                          </div>
+                          <div className="mca-review-actions">
+                            {reviewStatus == null ? (
+                              <>
+                                <span className="mca-review-prompt">Is this an MCA?</span>
+                                <button
+                                  className="btn-mca-yes"
+                                  onClick={() => handlePositionReview(pos.lender, true)}
+                                >
+                                  Yes
+                                </button>
+                                <button
+                                  className="btn-mca-no"
+                                  onClick={() => handlePositionReview(pos.lender, false)}
+                                >
+                                  No
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <span className={`mca-review-status ${isConfirmed ? 'confirmed' : 'rejected'}`}>
+                                  {isConfirmed ? 'Confirmed MCA' : 'Not an MCA'}
+                                </span>
+                                <button
+                                  className="btn-mca-undo"
+                                  onClick={() => setPositionReviews(prev => ({ ...prev, [pos.lender]: null }))}
+                                >
+                                  Undo
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="no-positions">No existing MCA positions detected</p>
+                )}
+              </section>
+
+              {/* Info Needed For Sheet (calculator-dependent metrics) */}
+              <section className="summary-section metrics-section">
+                <h4>Info Needed For Sheet</h4>
+                <div className="metrics-grid">
+                  <div className="metric-item">
+                    <span className="label">Total Monthly Payments (Existing)</span>
+                    <span className="value">${existingMonthlyPayments.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Diesel's Total Monthly Payments</span>
+                    <span className="value">${dieselMonthlyPayment.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item highlight">
+                    <span className="label">Total Monthly Payments (Including Diesel's new deal)</span>
+                    <span className="value">${totalMonthlyWithDiesel.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Average Monthly Income</span>
+                    <span className="value">${avgMonthlyIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Deductions</span>
+                    <span className="value">${deductions.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Monthly Net Revenue</span>
+                    <span className="value">${monthlyNetRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Annual Income</span>
+                    <span className="value">${annualIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Length of Deal (months)</span>
+                    <span className="value">{lengthOfDealMonths.toFixed(2)}</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Holdback Percentage / Monthly Holdback</span>
+                    <span className="value">{holdbackPercent.toFixed(2)}%</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Monthly Payment to Monthly Income (as a percentage)</span>
+                    <span className="value">{paymentToIncomePercent.toFixed(2)}%</span>
+                  </div>
+                  <div className="metric-item">
+                    <span className="label">Original Balance to Annual Income (As a percentage)</span>
+                    <span className="value">{balanceToAnnualIncomePercent.toFixed(2)}%</span>
+                  </div>
+                </div>
+              </section>
+
+              {/* Monthly Revenues (from Claude) */}
+              {analysis.monthlyRevenues.length > 0 && (
+                <section className="summary-section revenues-section">
+                  <h4>Monthly Revenue Breakdown</h4>
+                  <table className="spreadsheet-table">
+                    <thead>
+                      <tr>
+                        <th>Month</th>
+                        <th>Deposits</th>
+                        <th>Withdrawals</th>
+                        <th>Net</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {analysis.monthlyRevenues.map((rev, idx) => {
+                        const [yearStr, monthStr] = rev.month.split('-')
+                        const date = new Date(parseInt(yearStr), parseInt(monthStr) - 1, 1)
+                        const monthName = date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
+                        return (
+                          <tr key={idx}>
+                            <td className="cell-label">{monthName}</td>
+                            <td className="cell-value positive">${rev.deposits.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                            <td className="cell-value negative">${rev.withdrawals.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
+                            <td className={`cell-value ${rev.net >= 0 ? 'positive' : 'negative'}`}>
+                              ${rev.net.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr>
+                        <td className="cell-label"><strong>Average</strong></td>
+                        <td className="cell-value positive"><strong>${avgMonthlyIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></td>
+                        <td className="cell-value negative"><strong>${avgMonthlyWithdrawals.toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong></td>
+                        <td className={`cell-value ${(avgMonthlyIncome - avgMonthlyWithdrawals) >= 0 ? 'positive' : 'negative'}`}>
+                          <strong>${(avgMonthlyIncome - avgMonthlyWithdrawals).toLocaleString(undefined, { maximumFractionDigits: 0 })}</strong>
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </section>
+              )}
+
+              {/* Position Stacking Analysis (calculator-dependent) */}
+              <section className="summary-section stacking-section">
+                <h4>Position Stacking Analysis</h4>
+
+                <div className="stacking-grid">
+                  <div className="stack-item">
+                    <span className="label">Existing Daily Obligation</span>
+                    <span className="value">${existingDailyObligation.toLocaleString()}</span>
+                  </div>
+                  <div className="stack-item">
+                    <span className="label">+ New Daily Obligation</span>
+                    <span className="value">${newDailyObligation.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="stack-item total">
+                    <span className="label">= Total Daily Obligation</span>
+                    <span className="value">${totalDailyObligation.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                  </div>
+                </div>
+
+                <div className="utilization">
+                  <div className="utilization-header">
+                    <span>Daily Deposit Utilization</span>
+                    <span className={utilizationPercent > 50 ? 'danger' : utilizationPercent > 30 ? 'warning' : 'good'}>
+                      {utilizationPercent.toFixed(1)}%
+                    </span>
+                  </div>
+                  <div className="utilization-bar">
+                    <div
+                      className={`utilization-fill ${utilizationPercent > 50 ? 'danger' : utilizationPercent > 30 ? 'warning' : 'good'}`}
+                      style={{ width: `${Math.min(utilizationPercent, 100)}%` }}
+                    />
+                  </div>
+                  <p className="utilization-note">
+                    Avg Daily Deposits: ${avgDailyDeposit.toLocaleString()}
+                  </p>
+                </div>
+              </section>
+
+              {/* Data Source Reference */}
+              <section className="summary-section data-reference">
+                <p>
+                  <small>
+                    Analysis generated by Claude AI from Koncile-extracted data.
+                    {analysis.analyzedAt && ` Analyzed: ${new Date(analysis.analyzedAt).toLocaleString()}`}
+                  </small>
+                </p>
+              </section>
+            </>
+          )}
         </>
       )}
     </div>
